@@ -4,14 +4,19 @@ ESG data ingestion + analyst review. Django REST backend, React/TypeScript front
 
 Single seeded tenant ("Demo Enterprise Client"). No authentication — that's a deliberate scope choice, documented in [TRADEOFFS.md](TRADEOFFS.md).
 
-The design rationale lives in:
+## Documentation
 
-- [MODEL.md](MODEL.md) — data model walkthrough.
-- [DECISIONS.md](DECISIONS.md) — 14 design decisions with the "why".
-- [TRADEOFFS.md](TRADEOFFS.md) — what I deliberately did not build.
-- [SOURCES.md](SOURCES.md) — per-source: what I researched, what I built, what would break in production.
-- [PLAN.md](PLAN.md) — milestones, what shipped, what I'd build next.
+I have kept the design rationale in separate documents so the project is easy to review beyond just the deployed app. These docs explain how I approached the assignment, how I modeled the data, what decisions I made, what I intentionally left out, and how I handled realistic source-specific edge cases.
 
+| Document | What it explains |
+|---|---|
+| [APPROACH.md](APPROACH.md) | My end-to-end approach: problem understanding, architecture, ingestion-review flow, Groq usage, tenant design, and deployment approach. |
+| [MODEL.md](MODEL.md) | The core data model: tenants, ingestion batches, raw records, normalized activities, validation issues, provenance, confidence scoring, review logs, and audit lock. |
+| [DECISIONS.md](DECISIONS.md) | The key design decisions I made and the reasoning behind each one. |
+| [TRADEOFFS.md](TRADEOFFS.md) | The things I deliberately did not build, why I left them out, and what I would do in production. |
+| [SOURCES.md](SOURCES.md) | The research links and source-shape evidence I used for SAP, utility data, travel systems, Groq, and ESG platform design. |
+| [LOOPHOLES_RESEARCH.md](LOOPHOLES_RESEARCH.md) | The real-world ingestion traps I identified, such as purchase vs consumption, estimated readings, cancelled bookings, duplicates, reversals, and LLM numeric hallucination. |
+| [PLAN.md](PLAN.md) | The build plan, shipped scope, milestones, and future improvements. |
 ---
 
 ## Run it locally
