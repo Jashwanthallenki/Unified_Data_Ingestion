@@ -25,7 +25,7 @@ The app is intentionally unauthenticated for prototype simplicity. This is a del
 Add deployed app URL here:
 
 ```txt
-https://<your-render-app>.onrender.com
+[https://<your-render-app>.onrender.com](https://unified-data-ingestion.onrender.com/)
 ```
 
 Demo tenant:
