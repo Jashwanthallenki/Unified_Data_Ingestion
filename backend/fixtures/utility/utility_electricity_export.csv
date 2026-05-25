@@ -1,0 +1,24 @@
+provider,account_number,meter_number,service_address,billing_start,billing_end,usage_kwh,demand_kw,tariff,total_amount,currency,reading_type,previous_reading,current_reading,bill_type,charge_type,notes
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2024-12-28,2025-01-27,12500,45,Commercial-I,2450.00,EUR,actual,98500,111000,electricity,consumption,Spans Dec/Jan calendar months
+EnergieHH,ACC-9001,MTR-1002,100 Industriestr Hamburg,2024-12-28,2025-01-27,8400,32,Commercial-I,1650.00,EUR,actual,76000,84400,electricity,consumption,Second meter at same Hamburg site
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-01-28,2025-02-25,11800,42,Commercial-I,2310.00,EUR,estimated,111000,122800,electricity,consumption,Estimated reading
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-01-28,2025-02-25,12300,44,Commercial-I,2410.00,EUR,actual,111000,123300,electricity,consumption,Possible amended bill - overlaps prior estimated
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-02-26,2025-03-30,21500,50,Commercial-I,4200.00,EUR,actual,123300,144800,electricity,consumption,33-day period - check spike vs usage per day
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-03-31,2025-04-28,9200,38,Commercial-I,1810.00,EUR,actual,144800,154000,electricity,consumption,29-day period
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-01-15,2025-01-15,0,,Commercial-I,15.00,EUR,actual,,,electricity,late_fee,Late fee only
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-02-01,2025-02-01,0,,Commercial-I,180.00,EUR,actual,,,electricity,tax,Tax line item only
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-03-01,2025-03-01,,,Commercial-I,500.00,EUR,actual,,,electricity,adjustment,Amount-only adjustment - no usage value
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-04-29,2025-05-29,-200,,Commercial-I,-40.00,EUR,actual,154000,153800,electricity,refund,Negative kWh refund/correction
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-05-30,2025-06-30,0,38,Commercial-I,300.00,EUR,actual,153800,153800,electricity,consumption,Zero kWh - reading did not advance
+EnergieHH,ACC-9001,MTR-1003,100 Industriestr Hamburg,2025-01-01,2025-01-31,5400,,Commercial-I,1080.00,EUR,actual,,,electricity,consumption,Unmapped meter MTR-1003
+UK-Power,ACC-9002,MTR-2001,200 Oxford Street London,2025-01-01,2025-01-31,4500,18,Commercial-II,1100.00,GBP,actual,30000,34500,electricity,consumption,London site
+UK-Power,ACC-9002,MTR-2001,200 Oxford Street London,2025-02-01,2025-02-28,4200,17,Commercial-II,1030.00,GBP,actual,34500,38700,electricity,consumption,London Feb
+ComEd,ACC-9003,MTR-3001,300 Lake Shore Chicago,2025-01-01,2025-01-31,9800,42,Commercial-III,1450.00,USD,actual,80000,89800,electricity,consumption,Chicago site
+ComEd,ACC-9003,MTR-3001,300 Lake Shore Chicago,2025-02-01,2025-02-28,9200,40,Commercial-III,1360.00,USD,actual,89800,99000,electricity,consumption,
+ComEd,ACC-9003,MTR-3001,300 Lake Shore Chicago,2025-03-01,2025-03-31,8400,35,Commercial-III,1240.00,USD,actual,99000,107400,electricity,consumption,
+EnergieMUC,ACC-9005,MTR-G001,500 Bahnhofstr Munich,2025-01-01,2025-01-31,120,,Gas-Commercial,250.00,EUR,actual,,,gas,consumption,GAS in therms - should be rejected from electricity import
+TataPower,ACC-9006,MTR-5001,600 BKC Mumbai,2025-01-01,2025-01-31,6500,28,Commercial-Industrial,55000.00,INR,actual,40000,46500,electricity,consumption,Mumbai site
+TataPower,ACC-9006,MTR-5001,600 BKC Mumbai,2025-02-01,2025-02-28,5800,26,Commercial-Industrial,49100.00,INR,actual,46500,52300,electricity,consumption,
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-07-01,2025-07-31,9000,40,Commercial-I,1780.00,EUR,actual,153800,162800,electricity,consumption,Summer reading
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-05-15,2025-06-15,9500,40,Commercial-I,1860.00,EUR,actual,,,electricity,consumption,Period invalid: end before another row's start with same meter
+,ACC-9001,MTR-1001,100 Industriestr Hamburg,2025-08-01,2025-08-31,8800,39,Commercial-I,1720.00,EUR,actual,162800,171600,electricity,consumption,Missing provider field

@@ -1,0 +1,16 @@
+source_unit,normalized_unit,conversion_factor,note,version
+L,litres,1,Litres,v1
+LTR,litres,1,Litres (alt code),v1
+KG,kg,1,Kilograms,v1
+G,kg,0.001,Grams,v1
+TO,tonnes,1,Metric tonnes,v1
+T,tonnes,1,Metric tonnes (alt),v1
+M3,m3,1,Cubic metres,v1
+GAL,litres,3.785412,US gallons converted to litres,v1
+USG,litres,3.785412,US gallons (alt code),v1
+MJ,kWh,0.277778,Megajoules to kWh,v1
+KWH,kWh,1,Kilowatt-hours,v1
+ST,each,1,Stueck / pieces - no physical energy; spend fallback,v1
+RM,reams,1,Reams of paper - no physical energy; spend fallback,v1
+EACH,each,1,Pieces (English),v1
+BOX,each,1,Box - no physical energy; spend fallback,v1

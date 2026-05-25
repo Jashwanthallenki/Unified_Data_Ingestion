@@ -1,0 +1,10 @@
+segment_type,scope,scope_category,vendor_pattern,version
+flight,3,3.6 business travel,,v1
+hotel,3,3.6 business travel,,v1
+car_rental,3,3.6 business travel,,v1
+car,3,3.6 business travel,,v1
+rail,3,3.6 business travel,,v1
+rideshare,3,3.6 business travel,,v1
+taxi,3,3.6 business travel,,v1
+expense,3,3.6 business travel,,v1
+commute,3,3.7 employee commuting,,v1

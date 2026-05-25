@@ -1,0 +1,7 @@
+provider,account_number,meter_number,service_address,facility_code,facility_name,facility_country,version
+EnergieHH,ACC-9001,MTR-1001,100 Industriestr Hamburg,1000,Hamburg Factory A,Germany,v1
+EnergieHH,ACC-9001,MTR-1002,100 Industriestr Hamburg,1000,Hamburg Factory A,Germany,v1
+UK-Power,ACC-9002,MTR-2001,200 Oxford Street London,4000,London Office,UK,v1
+ComEd,ACC-9003,MTR-3001,300 Lake Shore Chicago,3000,Chicago Operations Center,USA,v1
+EnergieMUC,ACC-9005,MTR-2002,500 Bahnhofstr Munich,2000,Munich Logistics Hub,Germany,v1
+TataPower,ACC-9006,MTR-5001,600 BKC Mumbai,5000,Mumbai Service Hub,India,v1

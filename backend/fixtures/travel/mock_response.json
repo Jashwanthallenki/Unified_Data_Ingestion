@@ -1,0 +1,673 @@
+{
+  "provider": "MockCorpTravel",
+  "schema_version": "1.0",
+  "description": "Mock corporate travel sync response. Shape modelled on Concur/Navan-style segment-typed records.",
+  "trips": [
+    {
+      "trip_id": "T-10001",
+      "employee_id": "E-501",
+      "employee_email": "alice.kumar@demo.example",
+      "trip_name": "Berlin Sales Visit",
+      "start_date": "2025-02-10",
+      "end_date": "2025-02-13",
+      "segments": [
+        {
+          "segment_id": "S-10001-1",
+          "leg_id": "L-10001-out",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "Lufthansa",
+          "ticket_number": "220-2233445566",
+          "confirmation_number": "ABC123",
+          "origin": "LHR",
+          "destination": "BER",
+          "departure_datetime": "2025-02-10T08:30:00Z",
+          "arrival_datetime": "2025-02-10T11:15:00Z",
+          "distance_km": 932,
+          "cabin_class": "Y",
+          "class_of_service": "Economy",
+          "transport_mode": "air",
+          "currency": "EUR",
+          "amount": 320.00
+        },
+        {
+          "segment_id": "S-10001-2",
+          "leg_id": "L-10001-back",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "Lufthansa",
+          "ticket_number": "220-2233445567",
+          "confirmation_number": "ABC123",
+          "origin": "BER",
+          "destination": "LHR",
+          "departure_datetime": "2025-02-13T18:00:00Z",
+          "arrival_datetime": "2025-02-13T19:30:00Z",
+          "distance_km": 932,
+          "cabin_class": "Y",
+          "class_of_service": "Economy",
+          "transport_mode": "air",
+          "currency": "EUR",
+          "amount": 340.00
+        },
+        {
+          "segment_id": "S-10001-3",
+          "leg_id": null,
+          "segment_type": "hotel",
+          "booking_status": "completed",
+          "vendor": "Hilton Berlin",
+          "confirmation_number": "HIL-77721",
+          "city": "Berlin",
+          "country": "Germany",
+          "check_in_date": "2025-02-10",
+          "check_out_date": "2025-02-13",
+          "room_count": 1,
+          "currency": "EUR",
+          "amount": 720.00
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10002",
+      "employee_id": "E-502",
+      "employee_email": "bob.singh@demo.example",
+      "trip_name": "London-Delhi via Frankfurt",
+      "start_date": "2025-02-15",
+      "end_date": "2025-02-20",
+      "segments": [
+        {
+          "segment_id": "S-10002-1",
+          "leg_id": "L-10002-out",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "Lufthansa",
+          "ticket_number": "220-3344556677",
+          "confirmation_number": "DEF456",
+          "origin": "LHR",
+          "destination": "FRA",
+          "departure_datetime": "2025-02-15T10:00:00Z",
+          "arrival_datetime": "2025-02-15T12:35:00Z",
+          "distance_km": 656,
+          "cabin_class": "C",
+          "class_of_service": "Business",
+          "transport_mode": "air",
+          "currency": "EUR",
+          "amount": 1200.00
+        },
+        {
+          "segment_id": "S-10002-2",
+          "leg_id": "L-10002-out",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "Lufthansa",
+          "ticket_number": "220-3344556678",
+          "confirmation_number": "DEF456",
+          "origin": "FRA",
+          "destination": "DEL",
+          "departure_datetime": "2025-02-15T14:15:00Z",
+          "arrival_datetime": "2025-02-16T01:55:00Z",
+          "distance_km": 6113,
+          "cabin_class": "C",
+          "class_of_service": "Business",
+          "transport_mode": "air",
+          "currency": "EUR",
+          "amount": 2800.00
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10003",
+      "employee_id": "E-503",
+      "trip_name": "NY Trip — cancelled",
+      "start_date": "2025-02-20",
+      "end_date": "2025-02-22",
+      "segments": [
+        {
+          "segment_id": "S-10003-1",
+          "leg_id": "L-10003-out",
+          "segment_type": "flight",
+          "booking_status": "cancelled",
+          "vendor": "British Airways",
+          "ticket_number": "125-7788990011",
+          "confirmation_number": "GHI789",
+          "origin": "LHR",
+          "destination": "JFK",
+          "departure_datetime": "2025-02-20T11:00:00Z",
+          "distance_km": 5536,
+          "cabin_class": "Y",
+          "class_of_service": "Economy",
+          "transport_mode": "air",
+          "currency": "GBP",
+          "amount": 450.00
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10004",
+      "employee_id": "E-504",
+      "trip_name": "Paris — refunded",
+      "start_date": "2025-02-22",
+      "end_date": "2025-02-22",
+      "segments": [
+        {
+          "segment_id": "S-10004-1",
+          "leg_id": "L-10004-out",
+          "segment_type": "flight",
+          "booking_status": "refunded",
+          "vendor": "Air France",
+          "ticket_number": "057-1122334455",
+          "confirmation_number": "JKL012",
+          "origin": "LHR",
+          "destination": "CDG",
+          "departure_datetime": "2025-02-22T07:00:00Z",
+          "arrival_datetime": "2025-02-22T09:20:00Z",
+          "distance_km": 344,
+          "cabin_class": "Y",
+          "class_of_service": "Economy",
+          "transport_mode": "air",
+          "currency": "EUR",
+          "amount": 180.00
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10005",
+      "employee_id": "E-505",
+      "trip_name": "Madrid — voided",
+      "start_date": "2025-02-25",
+      "end_date": "2025-02-25",
+      "segments": [
+        {
+          "segment_id": "S-10005-1",
+          "leg_id": "L-10005-out",
+          "segment_type": "flight",
+          "booking_status": "voided",
+          "vendor": "Iberia",
+          "ticket_number": "075-9988776655",
+          "confirmation_number": "MNO345",
+          "origin": "LHR",
+          "destination": "MAD",
+          "departure_datetime": "2025-02-25T09:00:00Z",
+          "distance_km": 1244,
+          "cabin_class": "Y",
+          "class_of_service": "Economy",
+          "transport_mode": "air",
+          "currency": "EUR",
+          "amount": 210.00
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10006",
+      "employee_id": "E-506",
+      "trip_name": "Codeshare LHR-EWR",
+      "start_date": "2025-03-02",
+      "end_date": "2025-03-05",
+      "segments": [
+        {
+          "segment_id": "S-10006-1",
+          "leg_id": "L-10006-out",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "United Airlines (operated by Lufthansa)",
+          "ticket_number": "016-5566778899",
+          "confirmation_number": "PQR678",
+          "marketing_carrier": "UA",
+          "operating_carrier": "LH",
+          "origin": "LHR",
+          "destination": "EWR",
+          "departure_datetime": "2025-03-02T13:00:00Z",
+          "arrival_datetime": "2025-03-02T16:00:00Z",
+          "distance_km": 5559,
+          "cabin_class": "W",
+          "class_of_service": "Premium Economy",
+          "transport_mode": "air",
+          "currency": "USD",
+          "amount": 1450.00
+        },
+        {
+          "segment_id": "S-10006-2",
+          "leg_id": "L-10006-out",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "Lufthansa (codeshare)",
+          "ticket_number": "220-5566778899",
+          "confirmation_number": "PQR678-CODESHARE",
+          "marketing_carrier": "LH",
+          "operating_carrier": "LH",
+          "origin": "LHR",
+          "destination": "EWR",
+          "departure_datetime": "2025-03-02T13:00:00Z",
+          "arrival_datetime": "2025-03-02T16:00:00Z",
+          "distance_km": 5559,
+          "cabin_class": "W",
+          "class_of_service": "Premium Economy",
+          "transport_mode": "air",
+          "currency": "USD",
+          "amount": 1450.00,
+          "note": "Codeshare duplicate of S-10006-1; same operating flight"
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10007",
+      "employee_id": "E-507",
+      "trip_name": "Conference Singapore",
+      "start_date": "2025-03-08",
+      "end_date": "2025-03-12",
+      "segments": [
+        {
+          "segment_id": "S-10007-1",
+          "leg_id": "L-10007-out",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "Singapore Airlines",
+          "ticket_number": "618-1199887766",
+          "confirmation_number": "STU901",
+          "origin": "LHR",
+          "destination": "SIN",
+          "departure_datetime": "2025-03-08T21:00:00Z",
+          "arrival_datetime": "2025-03-09T17:15:00Z",
+          "distance_km": null,
+          "cabin_class": "F",
+          "class_of_service": "First",
+          "transport_mode": "air",
+          "currency": "USD",
+          "amount": 6800.00,
+          "note": "Distance missing — must be inferred from airport codes via haversine"
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10008",
+      "employee_id": "E-508",
+      "trip_name": "Client visit — opaque city pair",
+      "start_date": "2025-03-15",
+      "end_date": "2025-03-15",
+      "segments": [
+        {
+          "segment_id": "S-10008-1",
+          "leg_id": "L-10008-out",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "Discount Air",
+          "confirmation_number": "VWX234",
+          "origin_city": "Springfield",
+          "destination_city": "Riverdale",
+          "distance_km": null,
+          "cabin_class": null,
+          "transport_mode": "air",
+          "currency": "USD",
+          "amount": 290.00,
+          "note": "No IATA codes AND no distance — should flag MISSING_FLIGHT_DISTANCE"
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10009",
+      "employee_id": "E-509",
+      "trip_name": "Hotel-only stay Frankfurt",
+      "start_date": "2025-03-20",
+      "end_date": "2025-03-22",
+      "segments": [
+        {
+          "segment_id": "S-10009-1",
+          "leg_id": null,
+          "segment_type": "hotel",
+          "booking_status": "completed",
+          "vendor": "Marriott Frankfurt",
+          "confirmation_number": "MAR-99001",
+          "city": "Frankfurt",
+          "country": "Germany",
+          "check_in_date": "2025-03-20",
+          "check_out_date": "2025-03-22",
+          "room_count": 1,
+          "currency": "EUR",
+          "amount": 480.00
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10010",
+      "employee_id": "E-510",
+      "trip_name": "Hotel — missing checkout",
+      "start_date": "2025-03-22",
+      "end_date": "2025-03-25",
+      "segments": [
+        {
+          "segment_id": "S-10010-1",
+          "leg_id": null,
+          "segment_type": "hotel",
+          "booking_status": "completed",
+          "vendor": "Hyatt Mumbai",
+          "confirmation_number": "HY-44002",
+          "city": "Mumbai",
+          "country": "India",
+          "check_in_date": "2025-03-22",
+          "check_out_date": null,
+          "room_count": 1,
+          "currency": "INR",
+          "amount": 35000.00,
+          "note": "Checkout missing — must flag MISSING_CHECKOUT"
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10011",
+      "employee_id": "E-511",
+      "trip_name": "Hotel — same-day",
+      "start_date": "2025-03-26",
+      "end_date": "2025-03-26",
+      "segments": [
+        {
+          "segment_id": "S-10011-1",
+          "leg_id": null,
+          "segment_type": "hotel",
+          "booking_status": "completed",
+          "vendor": "Airport Inn",
+          "confirmation_number": "AI-22099",
+          "city": "Dubai",
+          "country": "UAE",
+          "check_in_date": "2025-03-26",
+          "check_out_date": "2025-03-26",
+          "room_count": 1,
+          "currency": "USD",
+          "amount": 90.00,
+          "note": "Same-day check-in/out — ZERO_ROOM_NIGHTS"
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10012",
+      "employee_id": "E-512",
+      "trip_name": "Bundled package Paris",
+      "start_date": "2025-04-01",
+      "end_date": "2025-04-04",
+      "segments": [
+        {
+          "segment_id": "S-10012-1",
+          "leg_id": "L-10012-pkg",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "ExpediaCorp",
+          "confirmation_number": "EXP-55012",
+          "origin": "LHR",
+          "destination": "CDG",
+          "departure_datetime": "2025-04-01T08:00:00Z",
+          "distance_km": 344,
+          "cabin_class": "Y",
+          "class_of_service": "Economy",
+          "transport_mode": "air",
+          "currency": "GBP",
+          "amount": 0.00,
+          "package_bundle_id": "PKG-55012",
+          "note": "Part of bundled flight+hotel package — BUNDLED_TRAVEL_PACKAGE"
+        },
+        {
+          "segment_id": "S-10012-2",
+          "leg_id": null,
+          "segment_type": "hotel",
+          "booking_status": "completed",
+          "vendor": "ExpediaCorp",
+          "confirmation_number": "EXP-55012",
+          "city": "Paris",
+          "country": "France",
+          "check_in_date": "2025-04-01",
+          "check_out_date": "2025-04-04",
+          "room_count": 1,
+          "currency": "GBP",
+          "amount": 0.00,
+          "package_bundle_id": "PKG-55012",
+          "note": "Bundled with flight S-10012-1"
+        },
+        {
+          "segment_id": "S-10012-3",
+          "leg_id": null,
+          "segment_type": "expense",
+          "booking_status": "completed",
+          "vendor": "ExpediaCorp",
+          "confirmation_number": "EXP-55012",
+          "package_bundle_id": "PKG-55012",
+          "currency": "GBP",
+          "amount": 980.00,
+          "note": "Total package amount — needs itemization to be useful"
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10013",
+      "employee_id": "E-513",
+      "trip_name": "Car rental same city Mumbai",
+      "start_date": "2025-04-05",
+      "end_date": "2025-04-08",
+      "segments": [
+        {
+          "segment_id": "S-10013-1",
+          "leg_id": null,
+          "segment_type": "car_rental",
+          "booking_status": "completed",
+          "vendor": "Hertz Mumbai",
+          "confirmation_number": "HZ-66013",
+          "pickup_city": "Mumbai",
+          "dropoff_city": "Mumbai",
+          "pickup_datetime": "2025-04-05T09:00:00Z",
+          "dropoff_datetime": "2025-04-08T18:00:00Z",
+          "distance_km": null,
+          "fuel_litres": null,
+          "currency": "INR",
+          "amount": 12000.00,
+          "note": "Same city — distance unknown; potential double-count if employee submits fuel receipt"
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10014",
+      "employee_id": "E-514",
+      "trip_name": "Car rental Frankfurt-Munich",
+      "start_date": "2025-04-10",
+      "end_date": "2025-04-12",
+      "segments": [
+        {
+          "segment_id": "S-10014-1",
+          "leg_id": null,
+          "segment_type": "car_rental",
+          "booking_status": "completed",
+          "vendor": "Sixt",
+          "confirmation_number": "SX-77014",
+          "pickup_city": "Frankfurt",
+          "dropoff_city": "Munich",
+          "pickup_datetime": "2025-04-10T08:00:00Z",
+          "dropoff_datetime": "2025-04-12T17:00:00Z",
+          "distance_km": 420,
+          "fuel_litres": null,
+          "currency": "EUR",
+          "amount": 280.00
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10015",
+      "employee_id": "E-515",
+      "trip_name": "Rideshare amount-only",
+      "start_date": "2025-04-15",
+      "end_date": "2025-04-15",
+      "segments": [
+        {
+          "segment_id": "S-10015-1",
+          "leg_id": null,
+          "segment_type": "rideshare",
+          "booking_status": "completed",
+          "vendor": "Uber",
+          "confirmation_number": "UB-88015",
+          "city": "Bengaluru",
+          "country": "India",
+          "distance_km": null,
+          "currency": "INR",
+          "amount": 850.00,
+          "note": "Amount only — spend-based, low confidence"
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10016",
+      "employee_id": "E-516",
+      "trip_name": "Expense-only, no travel segment",
+      "start_date": "2025-04-18",
+      "end_date": "2025-04-18",
+      "segments": [
+        {
+          "segment_id": "S-10016-1",
+          "leg_id": null,
+          "segment_type": "expense",
+          "booking_status": "completed",
+          "vendor": "Generic Vendor",
+          "confirmation_number": "EX-99016",
+          "currency": "EUR",
+          "amount": 150.00,
+          "note": "No travel segment — exclude"
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10017",
+      "employee_id": "E-517",
+      "trip_name": "Eurostar London-Paris",
+      "start_date": "2025-04-22",
+      "end_date": "2025-04-23",
+      "segments": [
+        {
+          "segment_id": "S-10017-1",
+          "leg_id": "L-10017-out",
+          "segment_type": "rail",
+          "booking_status": "completed",
+          "vendor": "Eurostar",
+          "confirmation_number": "EU-10017",
+          "origin_city": "London",
+          "destination_city": "Paris",
+          "distance_km": 466,
+          "transport_mode": "rail",
+          "currency": "GBP",
+          "amount": 220.00
+        },
+        {
+          "segment_id": "S-10017-2",
+          "leg_id": "L-10017-back",
+          "segment_type": "rail",
+          "booking_status": "completed",
+          "vendor": "Eurostar",
+          "confirmation_number": "EU-10017",
+          "origin_city": "Paris",
+          "destination_city": "London",
+          "distance_km": 466,
+          "transport_mode": "rail",
+          "currency": "GBP",
+          "amount": 230.00
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10018",
+      "employee_id": "E-518",
+      "trip_name": "Unknown cabin class Hong Kong",
+      "start_date": "2025-04-28",
+      "end_date": "2025-05-02",
+      "segments": [
+        {
+          "segment_id": "S-10018-1",
+          "leg_id": "L-10018-out",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "Cathay Pacific",
+          "ticket_number": "160-3322110099",
+          "confirmation_number": "CX-10018",
+          "origin": "LHR",
+          "destination": "HKG",
+          "departure_datetime": "2025-04-28T11:00:00Z",
+          "arrival_datetime": "2025-04-29T07:30:00Z",
+          "distance_km": 9648,
+          "cabin_class": "ZZ",
+          "class_of_service": null,
+          "transport_mode": "air",
+          "currency": "USD",
+          "amount": 1850.00,
+          "note": "Unknown cabin class code — default to economy + flag"
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10019",
+      "employee_id": "E-519",
+      "trip_name": "Connecting LHR-DXB-BOM",
+      "start_date": "2025-05-05",
+      "end_date": "2025-05-09",
+      "segments": [
+        {
+          "segment_id": "S-10019-1",
+          "leg_id": "L-10019-out",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "Emirates",
+          "ticket_number": "176-7766554433",
+          "confirmation_number": "EK-10019",
+          "origin": "LHR",
+          "destination": "DXB",
+          "departure_datetime": "2025-05-05T14:00:00Z",
+          "arrival_datetime": "2025-05-06T00:30:00Z",
+          "distance_km": 5494,
+          "cabin_class": "J",
+          "class_of_service": "Business",
+          "transport_mode": "air",
+          "currency": "USD",
+          "amount": 2900.00
+        },
+        {
+          "segment_id": "S-10019-2",
+          "leg_id": "L-10019-out",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "Emirates",
+          "ticket_number": "176-7766554434",
+          "confirmation_number": "EK-10019",
+          "origin": "DXB",
+          "destination": "BOM",
+          "departure_datetime": "2025-05-06T03:00:00Z",
+          "arrival_datetime": "2025-05-06T07:35:00Z",
+          "distance_km": 1929,
+          "cabin_class": "J",
+          "class_of_service": "Business",
+          "transport_mode": "air",
+          "currency": "USD",
+          "amount": 0.00,
+          "note": "Onward leg, fare embedded in S-10019-1"
+        }
+      ]
+    },
+    {
+      "trip_id": "T-10020",
+      "employee_id": "E-520",
+      "trip_name": "Short hop premium economy",
+      "start_date": "2025-05-12",
+      "end_date": "2025-05-14",
+      "segments": [
+        {
+          "segment_id": "S-10020-1",
+          "leg_id": "L-10020-out",
+          "segment_type": "flight",
+          "booking_status": "completed",
+          "vendor": "Air France",
+          "ticket_number": "057-4433221100",
+          "confirmation_number": "AF-10020",
+          "origin": "LHR",
+          "destination": "AMS",
+          "departure_datetime": "2025-05-12T08:00:00Z",
+          "arrival_datetime": "2025-05-12T10:15:00Z",
+          "distance_km": 358,
+          "cabin_class": "W",
+          "class_of_service": "Premium Economy",
+          "transport_mode": "air",
+          "currency": "EUR",
+          "amount": 410.00
+        }
+      ]
+    }
+  ]
+}

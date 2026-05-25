@@ -1,0 +1,7 @@
+cost_center_code,description,business_unit,region,version
+CC-100,Operations DACH,Operations,EU,v1
+CC-200,Logistics NA,Logistics,NA,v1
+CC-300,IT Services Global,IT,Global,v1
+CC-400,Facilities Mumbai,Facilities,APAC,v1
+CC-500,Sales EMEA,Sales,EMEA,v1
+CC-600,R&D Cluster,R&D,Global,v1

@@ -1,0 +1,9 @@
+material_code,description,fuel_type,default_unit,density_kg_per_l,version
+MAT-1001,Diesel B7 ULSD,diesel,L,0.832,v1
+MAT-1002,Petrol/Gasoline 95 RON,petrol,L,0.745,v1
+MAT-1003,Natural gas distributed,natural_gas,M3,,v1
+MAT-1004,HSD Genset Fuel,diesel,L,0.832,v1
+MAT-1005,Heating oil EL,heating_oil,L,0.845,v1
+MAT-2001,Office paper A4 500-sheet,,RM,,v1
+MAT-2002,Cleaning chemical concentrate,,L,,v1
+MAT-9001,Diesel B7 ULSD (regional alt code),diesel,L,0.832,v1

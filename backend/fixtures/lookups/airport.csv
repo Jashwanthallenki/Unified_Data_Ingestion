@@ -1,0 +1,79 @@
+iata_code,name,city,country,latitude,longitude
+LHR,London Heathrow,London,UK,51.470020,-0.454295
+LGW,London Gatwick,London,UK,51.153700,-0.182063
+LCY,London City,London,UK,51.505278,0.055278
+CDG,Paris Charles de Gaulle,Paris,France,49.009690,2.547800
+ORY,Paris Orly,Paris,France,48.723333,2.379444
+FRA,Frankfurt am Main,Frankfurt,Germany,50.037936,8.562152
+MUC,Munich,Munich,Germany,48.353783,11.786086
+BER,Berlin Brandenburg,Berlin,Germany,52.366667,13.503333
+TXL,Berlin Tegel (closed),Berlin,Germany,52.559722,13.287778
+HAM,Hamburg,Hamburg,Germany,53.630278,9.991111
+AMS,Amsterdam Schiphol,Amsterdam,Netherlands,52.310500,4.768300
+MAD,Madrid Barajas,Madrid,Spain,40.498300,-3.567600
+BCN,Barcelona-El Prat,Barcelona,Spain,41.297400,2.083300
+FCO,Rome Fiumicino,Rome,Italy,41.800300,12.238900
+MXP,Milan Malpensa,Milan,Italy,45.630600,8.728100
+ZRH,Zurich,Zurich,Switzerland,47.464700,8.549200
+VIE,Vienna,Vienna,Austria,48.110200,16.569700
+BRU,Brussels,Brussels,Belgium,50.901400,4.484400
+CPH,Copenhagen,Copenhagen,Denmark,55.618100,12.656100
+ARN,Stockholm Arlanda,Stockholm,Sweden,59.649800,17.923700
+OSL,Oslo Gardermoen,Oslo,Norway,60.193900,11.100400
+HEL,Helsinki,Helsinki,Finland,60.317200,24.963300
+DUB,Dublin,Dublin,Ireland,53.421300,-6.270100
+IST,Istanbul,Istanbul,Turkey,41.275300,28.751900
+LIS,Lisbon,Lisbon,Portugal,38.781300,-9.135900
+DXB,Dubai International,Dubai,UAE,25.253200,55.365700
+DOH,Doha Hamad,Doha,Qatar,25.273500,51.608600
+AUH,Abu Dhabi,Abu Dhabi,UAE,24.433000,54.651100
+DEL,Indira Gandhi Delhi,Delhi,India,28.556200,77.100000
+BOM,Mumbai Chhatrapati Shivaji,Mumbai,India,19.089600,72.865600
+BLR,Bengaluru Kempegowda,Bengaluru,India,13.198600,77.706600
+MAA,Chennai,Chennai,India,12.994100,80.170900
+HYD,Hyderabad Rajiv Gandhi,Hyderabad,India,17.240300,78.429400
+CCU,Kolkata Subhas Chandra Bose,Kolkata,India,22.654700,88.446700
+SIN,Singapore Changi,Singapore,Singapore,1.364400,103.991500
+HKG,Hong Kong,Hong Kong,Hong Kong,22.308000,113.918500
+NRT,Tokyo Narita,Tokyo,Japan,35.772000,140.392900
+HND,Tokyo Haneda,Tokyo,Japan,35.549400,139.779800
+KIX,Osaka Kansai,Osaka,Japan,34.434700,135.244000
+ICN,Incheon Seoul,Seoul,South Korea,37.460200,126.440700
+PVG,Shanghai Pudong,Shanghai,China,31.144300,121.808300
+PEK,Beijing Capital,Beijing,China,40.080100,116.584600
+TPE,Taipei Taoyuan,Taipei,Taiwan,25.079700,121.234200
+BKK,Bangkok Suvarnabhumi,Bangkok,Thailand,13.690000,100.750100
+KUL,Kuala Lumpur,Kuala Lumpur,Malaysia,2.745600,101.709900
+CGK,Jakarta Soekarno-Hatta,Jakarta,Indonesia,-6.125600,106.655800
+MNL,Manila Ninoy Aquino,Manila,Philippines,14.508600,121.019400
+SYD,Sydney Kingsford Smith,Sydney,Australia,-33.939900,151.175300
+MEL,Melbourne Tullamarine,Melbourne,Australia,-37.669000,144.841000
+AKL,Auckland,Auckland,New Zealand,-37.008200,174.785000
+JFK,New York John F Kennedy,New York,USA,40.641300,-73.778100
+LGA,New York LaGuardia,New York,USA,40.776900,-73.874000
+EWR,Newark Liberty,Newark,USA,40.689500,-74.174500
+BOS,Boston Logan,Boston,USA,42.365600,-71.009600
+IAD,Washington Dulles,Washington,USA,38.953100,-77.456500
+DCA,Reagan National,Washington,USA,38.851200,-77.040200
+ATL,Atlanta Hartsfield-Jackson,Atlanta,USA,33.640700,-84.427700
+MIA,Miami,Miami,USA,25.795900,-80.287000
+ORD,Chicago O'Hare,Chicago,USA,41.974200,-87.907300
+DFW,Dallas Fort Worth,Dallas,USA,32.899800,-97.040300
+LAX,Los Angeles,Los Angeles,USA,33.941600,-118.408500
+SFO,San Francisco,San Francisco,USA,37.621300,-122.379000
+SEA,Seattle-Tacoma,Seattle,USA,47.450200,-122.308800
+YYZ,Toronto Pearson,Toronto,Canada,43.677700,-79.624800
+YUL,Montreal Trudeau,Montreal,Canada,45.470600,-73.740800
+YVR,Vancouver,Vancouver,Canada,49.193900,-123.184400
+GRU,Sao Paulo Guarulhos,Sao Paulo,Brazil,-23.435600,-46.473100
+GIG,Rio de Janeiro Galeao,Rio de Janeiro,Brazil,-22.809900,-43.250500
+EZE,Buenos Aires Ezeiza,Buenos Aires,Argentina,-34.822200,-58.535800
+MEX,Mexico City,Mexico City,Mexico,19.436100,-99.071900
+JNB,Johannesburg O R Tambo,Johannesburg,South Africa,-26.139200,28.246000
+CPT,Cape Town,Cape Town,South Africa,-33.964800,18.601700
+CAI,Cairo,Cairo,Egypt,30.121900,31.405600
+LOS,Lagos Murtala Muhammed,Lagos,Nigeria,6.577400,3.321100
+NBO,Nairobi Jomo Kenyatta,Nairobi,Kenya,-1.319200,36.927500
+TLV,Tel Aviv Ben Gurion,Tel Aviv,Israel,32.011400,34.886700
+RUH,Riyadh King Khalid,Riyadh,Saudi Arabia,24.957600,46.698800
+JED,Jeddah King Abdulaziz,Jeddah,Saudi Arabia,21.679600,39.156500

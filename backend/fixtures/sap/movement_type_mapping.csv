@@ -1,0 +1,13 @@
+movement_type,description,source_meaning,esg_relevance,activity_interpretation,default_action
+261,Goods issue to cost center/production,Consumption,CONSUMPTION,fuel_consumed,COUNT_AS_CONSUMPTION
+201,Goods issue to cost center direct,Direct consumption,CONSUMPTION,fuel_consumed,COUNT_AS_CONSUMPTION
+101,Goods receipt from supplier,Inbound receipt,PURCHASE,fuel_purchased,COUNT_AS_PURCHASE
+102,Reversal of goods receipt,Reversal of 101,REVERSAL,reverse_purchase,FLAG_REVERSAL
+202,Reversal of 201,Reversal of 201 consumption,REVERSAL,reverse_consumption,FLAG_REVERSAL
+262,Reversal of 261,Reversal of 261 consumption,REVERSAL,reverse_consumption,FLAG_REVERSAL
+301,Plant-to-plant transfer,Inventory transfer between plants,TRANSFER,inventory_transfer,FLAG_TRANSFER
+311,Storage-location transfer within plant,Internal transfer,TRANSFER,inventory_transfer,FLAG_TRANSFER
+551,Scrapping/write-off,Scrap,SCRAP,scrapped,NEEDS_ANALYST_REVIEW
+561,Initial inventory upload,Opening balance,ADJUSTMENT,inventory_adjustment,IGNORE_NON_RELEVANT
+411,Transfer posting to own stock,Stock conversion,TRANSFER,inventory_transfer,FLAG_TRANSFER
+601,Goods issue to delivery,Outbound delivery,TRANSFER,outbound_delivery,FLAG_TRANSFER

@@ -1,0 +1,7 @@
+plant_code,facility_name,facility_country,region,version
+1000,Hamburg Factory A,Germany,EU,v1
+2000,Munich Logistics Hub,Germany,EU,v1
+3000,Chicago Operations Center,USA,NA,v1
+4000,London Office,UK,EU,v1
+5000,Mumbai Service Hub,India,APAC,v1
+6000,Sao Paulo Distribution Center,Brazil,LATAM,v1

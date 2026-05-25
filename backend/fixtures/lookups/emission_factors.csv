@@ -1,0 +1,36 @@
+activity_type,activity_subtype,method,unit,factor,factor_unit,source,version,region,note
+fuel_consumed,diesel,fuel_based,litres,2.68,kgCO2e,DEFRA 2024 (illustrative),2024,global,Diesel B7 average
+fuel_consumed,petrol,fuel_based,litres,2.31,kgCO2e,DEFRA 2024 (illustrative),2024,global,Gasoline 95 RON
+fuel_consumed,natural_gas,fuel_based,m3,2.04,kgCO2e,DEFRA 2024 (illustrative),2024,global,Distributed natural gas
+fuel_consumed,heating_oil,fuel_based,litres,2.52,kgCO2e,DEFRA 2024 (illustrative),2024,global,Heating oil
+fuel_consumed,diesel,fuel_based,kg,3.21,kgCO2e,DEFRA 2024 (illustrative),2024,global,Diesel mass basis
+fuel_consumed,petrol,fuel_based,kg,3.10,kgCO2e,DEFRA 2024 (illustrative),2024,global,Petrol mass basis
+fuel_purchased,diesel,fuel_based,litres,2.68,kgCO2e,DEFRA 2024 (illustrative),2024,global,For reconciliation only
+electricity_usage,grid,location_based_scope2,kWh,0.400,kgCO2e,IEA 2023 (illustrative global average),2024,global,Generic global grid
+electricity_usage,grid,location_based_scope2,kWh,0.213,kgCO2e,DEFRA 2024 (illustrative),2024,UK,
+electricity_usage,grid,location_based_scope2,kWh,0.385,kgCO2e,DEFRA 2024 (illustrative),2024,Germany,
+electricity_usage,grid,location_based_scope2,kWh,0.371,kgCO2e,EPA eGRID (illustrative),2024,USA,
+electricity_usage,grid,location_based_scope2,kWh,0.713,kgCO2e,CEA 2023 (illustrative),2024,India,
+flight,short_haul_economy,distance_based,km,0.158,kgCO2e,DEFRA 2024 (illustrative),2024,global,< 3700 km economy
+flight,short_haul_business,distance_based,km,0.237,kgCO2e,DEFRA 2024 (illustrative),2024,global,< 3700 km business
+flight,long_haul_economy,distance_based,km,0.149,kgCO2e,DEFRA 2024 (illustrative),2024,global,>= 3700 km economy
+flight,long_haul_premium_economy,distance_based,km,0.239,kgCO2e,DEFRA 2024 (illustrative),2024,global,>= 3700 km premium economy
+flight,long_haul_business,distance_based,km,0.434,kgCO2e,DEFRA 2024 (illustrative),2024,global,>= 3700 km business
+flight,long_haul_first,distance_based,km,0.596,kgCO2e,DEFRA 2024 (illustrative),2024,global,>= 3700 km first
+hotel,standard,room_night_based,room-night,20.0,kgCO2e,Cornell Hotel Sustainability Benchmark (illustrative),2024,global,Generic global average
+car_rental,gasoline,distance_based,km,0.171,kgCO2e,DEFRA 2024 (illustrative),2024,global,Mid-size petrol
+car_rental,gasoline,fuel_based,litres,2.31,kgCO2e,DEFRA 2024 (illustrative),2024,global,
+rail,intercity,distance_based,km,0.041,kgCO2e,DEFRA 2024 (illustrative),2024,global,Intercity rail
+rideshare,gasoline,distance_based,km,0.183,kgCO2e,DEFRA 2024 (illustrative),2024,global,
+taxi,gasoline,distance_based,km,0.183,kgCO2e,DEFRA 2024 (illustrative),2024,global,
+spend_based,diesel,spend_based,EUR,0.30,kgCO2e,Illustrative,2024,global,kgCO2e per EUR for diesel
+spend_based,diesel,spend_based,USD,0.32,kgCO2e,Illustrative,2024,global,
+spend_based,electricity,spend_based,EUR,0.20,kgCO2e,Illustrative,2024,global,
+spend_based,hotel,spend_based,EUR,0.10,kgCO2e,Illustrative,2024,global,
+spend_based,hotel,spend_based,USD,0.10,kgCO2e,Illustrative,2024,global,
+spend_based,office_supplies,spend_based,EUR,0.05,kgCO2e,Illustrative,2024,global,
+spend_based,office_supplies,spend_based,USD,0.05,kgCO2e,Illustrative,2024,global,
+spend_based,office_supplies,spend_based,INR,0.001,kgCO2e,Illustrative,2024,global,
+spend_based,general,spend_based,USD,0.30,kgCO2e,Illustrative,2024,global,Generic per-dollar fallback
+spend_based,general,spend_based,EUR,0.30,kgCO2e,Illustrative,2024,global,Generic per-EUR fallback
+spend_based,general,spend_based,GBP,0.30,kgCO2e,Illustrative,2024,global,Generic per-GBP fallback
