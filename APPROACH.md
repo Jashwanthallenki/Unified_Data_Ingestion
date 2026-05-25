@@ -280,39 +280,81 @@ Example for a SAP fuel consumption row:
 
 ---
 
-## 11. Confidence scoring
+## 11. Confidence Scoring
 
-Every row is scored 0–100. I start at the method ceiling (100 for fuel-based, 95 for distance-based or location-based-Scope2, 90 for room-night-based, 60 for spend-based) and subtract a fixed amount per flag. The final score buckets into:
+I use confidence scoring as an analyst-prioritization layer, not as a replacement for review.
 
-- **80–100 → HIGH.** Ready for analyst approval; deterministic mappings worked.
-- **50–79 → MEDIUM.** Needs review; some flags applied (estimated reading, suspicious-but-handled, etc.).
-- **30–49 → LOW.** Eligible for Groq LLM suggestion; deterministic path failed but row still has useful context.
-- **<30 → FAILED.** Not safely normalizable; no audit-ready record produced.
+Every normalized row gets a score from `0–100`. The score helps the analyst quickly understand which records are close to approval and which records need deeper inspection.
 
-Sample deductions (full table is in [DECISIONS.md](DECISIONS.md) and `services/confidence.py`):
+The score starts from a method ceiling:
 
-- Unresolved activity type: −20.
-- Missing or zero quantity: −20.
-- Unknown unit: −15.
-- Missing date / period: −15.
-- Unresolved facility: −15.
-- Missing source reference: −10.
-- Estimated reading: −10 (and confidence capped at 70).
-- Distance estimated (haversine): −5.
-- Spend-based method: built into the 60 method ceiling, not an extra deduction.
-- LLM-suggested field: −10.
-- Suspicious-high quantity: −10.
-- Unresolved duplicate or reversal: −20.
-- Unresolved cancelled or refunded: −20.
+| Method type | Starting ceiling |
+|---|---:|
+| Fuel/activity-based | 100 |
+| Distance-based / location-based Scope 2 | 95 |
+| Room-night-based | 90 |
+| Spend-based fallback | 60 |
 
-**Why a number and bands instead of just flags or an ML score:**
+Then the system subtracts points for data-quality issues such as missing fields, unresolved mappings, estimated readings, suspicious quantities, duplicates, reversals, or cancellations.
 
-- Bands are the unit the analyst thinks in.
-- The number is what the system sorts on (focus attention on the lowest-quality rows).
-- The audit lock can be gated on a minimum threshold.
-- Every score is reconstructible from `flags` alone — that's what makes it defensible to an auditor.
+The final score is grouped into four bands:
 
----
+| Score | Band | Meaning |
+|---:|---|---|
+| 80–100 | HIGH | Mostly complete; ready for analyst approval. |
+| 50–79 | MEDIUM | Usable, but needs review because some warnings exist. |
+| 30–49 | LOW | Risky; may be eligible for Groq suggestion if enough raw context exists. |
+| <30 | FAILED | Not safely normalizable; should not become audit-ready. |
+
+Example deductions:
+
+- unresolved activity type: `-20`
+- missing or zero quantity: `-20`
+- unknown unit: `-15`
+- missing date or period: `-15`
+- unresolved facility: `-15`
+- missing source reference: `-10`
+- estimated reading: `-10` and confidence capped at `70`
+- estimated distance: `-5`
+- LLM-suggested field: `-10`
+- suspicious high quantity: `-10`
+- unresolved duplicate, reversal, cancellation, or refund: `-20`
+
+I chose a simple rule-based score instead of an ML score because the analyst needs to understand why a row is risky. Every score can be reconstructed from the row’s flags, which makes it explainable during review.
+
+In this prototype, confidence scoring mainly answers:
+
+```txt
+Which rows are closer to approval?
+Which rows are risky?
+Which rows should the analyst inspect first?
+```
+
+In a future version, I would extend this into **mapping confidence**. Instead of only scoring the final record, the system could also measure how many important fields were successfully mapped, such as activity type, facility, quantity, unit, date/period, scope category, and source reference.
+
+If mapping confidence is low, the system could decide whether to use additional assistance:
+
+- deterministic lookup from previous approved mappings,
+- ML-based classification for repeated patterns,
+- Groq-based text reasoning when enough raw context exists,
+- analyst clarification when the source data is too weak.
+
+Over time, approved and rejected analyst decisions can become training data for ML models. For example, ML models could help classify SAP material descriptions, predict procurement spend categories, suggest likely facility mappings, detect unusual usage patterns, or prioritize rows that are likely to need analyst attention.
+
+However, I would still keep strict guardrails. ML and LLM outputs should assist the analyst, not replace them. The system should never invent audit-critical numeric values such as fuel quantity, kWh, dates, distances, hotel nights, document numbers, or invoice references.
+
+The future direction is:
+
+```txt
+Direct mapping
+→ rule-based validation
+→ mapping confidence
+→ ML/Groq suggestions only when safe
+→ analyst approval
+→ audit lock
+```
+The goal is not to fully automate ESG reporting. The goal is to make analysts faster while keeping the system explainable, auditable, and safe.
+
 
 ## 12. Groq LLM integration
 
