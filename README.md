@@ -6,6 +6,20 @@ Single seeded tenant (`Demo Enterprise Client`). No authentication — deliberat
 
 ---
 
+## Documentation
+
+| Document | What it explains |
+|---|---|
+| [APPROACH.md](APPROACH.md) | End-to-end approach: problem framing, architecture, ingestion/review flow, Groq usage, tenant design, deployment. |
+| [MODEL.md](MODEL.md) | Tenants, batches, raw records, normalized activities, validation issues, provenance, confidence, review logs, audit lock. |
+| [DECISIONS.md](DECISIONS.md) | 14 numbered design decisions with reasoning + open questions for the PM. |
+| [TRADEOFFS.md](TRADEOFFS.md) | What I deliberately did not build, why, and what production would change. |
+| [SOURCES.md](SOURCES.md) | Per source: real-world format researched, sample-data choices, what would break in real deployment. |
+| [REAL_WORLD_DATA_TRAPS.md](REAL_WORLD_DATA_TRAPS.md) | Real-world ingestion traps: purchase vs consumption, estimated readings, cancellations, duplicates, reversals, LLM numeric hallucination. |
+| [PLAN.md](PLAN.md) | Build plan, shipped scope, milestones, future improvements. |
+
+---
+
 ## Tech stack
 
 **Backend** — Python 3.11, Django 5 + Django REST Framework, `pandas` + `openpyxl` for CSV/XLSX parsing, `python-dateutil` for mixed date formats, `groq` SDK for the optional LLM layer, `psycopg` (Postgres) with SQLite fallback, `dj-database-url` for env-driven DB config, `whitenoise` for static-file serving, `gunicorn` in production.
@@ -192,17 +206,3 @@ Push to a GitHub repo connected to Render. The included [`render.yaml`](render.y
 ```bash
 git update-index --chmod=+x render-build.sh   # one-time, before first push
 ```
-
----
-
-## Documentation
-
-| Document | What it explains |
-|---|---|
-| [APPROACH.md](APPROACH.md) | End-to-end approach: problem framing, architecture, ingestion/review flow, Groq usage, tenant design, deployment. |
-| [MODEL.md](MODEL.md) | Tenants, batches, raw records, normalized activities, validation issues, provenance, confidence, review logs, audit lock. |
-| [DECISIONS.md](DECISIONS.md) | 14 numbered design decisions with reasoning + open questions for the PM. |
-| [TRADEOFFS.md](TRADEOFFS.md) | What I deliberately did not build, why, and what production would change. |
-| [SOURCES.md](SOURCES.md) | Per source: real-world format researched, sample-data choices, what would break in real deployment. |
-| [REAL_WORLD_DATA_TRAPS.md](REAL_WORLD_DATA_TRAPS.md) | Real-world ingestion traps: purchase vs consumption, estimated readings, cancellations, duplicates, reversals, LLM numeric hallucination. |
-| [PLAN.md](PLAN.md) | Build plan, shipped scope, milestones, future improvements. |
