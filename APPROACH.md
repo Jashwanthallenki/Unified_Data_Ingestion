@@ -365,6 +365,89 @@ Groq is an **optional assisted reasoning layer**, not a source of truth. The imp
 
 **When it triggers.** Only for LOW-band rows (confidence 30–49) where deterministic mapping failed but the raw row still has useful text context (a material description, a vendor name, a free-text note). The analyst can also force it on a MEDIUM row from the UI.
 
+### Groq Usage and Data Exposure Guardrails
+
+Groq is used only as an assisted reasoning layer for low-confidence records. I do not send the entire database record blindly to the LLM. Before calling Groq, the backend builds a controlled context payload containing only the fields needed for safe text-based interpretation.
+
+The Groq context may include:
+
+- source type,
+- raw row fields relevant to classification,
+- partially normalized activity fields,
+- missing fields,
+- validation flags,
+- lookup context,
+- confidence score,
+- non-sensitive notes or descriptions.
+
+The Groq context should not expose:
+
+- API keys or environment variables,
+- internal database IDs unless required,
+- user passwords or auth tokens,
+- unnecessary employee personal data,
+- full audit logs,
+- unrelated tenant data,
+- fields from other clients,
+- locked record snapshots unless explicitly needed,
+- any data not required for the current suggestion.
+
+For travel data, employee identifiers should be minimized or masked where possible. For example, the LLM may need to know that a row is a business travel flight, but it does not need the employee's full personal details. For supplier or vendor data, only the useful classification context should be sent.
+
+The backend should use an allowlist-based `LLMContextBuilder` rather than passing full model objects directly. This keeps the Groq payload intentional, smaller, cheaper, and safer.
+
+Example allowed context:
+
+```json
+{
+  "source_type": "sap",
+  "raw_payload": {
+    "Materialkurztext": "HSD GENSET FUEL",
+    "Bewegungsart": "261",
+    "Menge": "5000",
+    "ME": "L",
+    "Werk": "DE01"
+  },
+  "partial_normalized_record": {
+    "activity_type": "fuel_combustion",
+    "quantity": 5000,
+    "normalized_unit": "litres",
+    "facility_status": "resolved"
+  },
+  "missing_fields": ["activity_subtype"],
+  "validation_flags": ["UNKNOWN_MATERIAL_CATEGORY"],
+  "lookup_context": {
+    "known_fuel_types": ["diesel", "petrol", "natural_gas"]
+  }
+}
+```
+
+Groq should return only structured suggestions:
+
+```json
+{
+  "suggestions": [
+    {
+      "field": "activity_subtype",
+      "suggested_value": "diesel",
+      "confidence": 0.78,
+      "reason": "The material description contains HSD and genset fuel, which commonly maps to diesel.",
+      "method": "LLM_SUGGESTED"
+    }
+  ]
+}
+```
+
+The frontend should expose only the final suggestion, confidence, and reasoning to the analyst. It should not expose the full hidden prompt, API key, or unnecessary raw context.
+
+This keeps Groq useful without making it a source of truth or leaking unnecessary data. The principle is:
+
+```txt
+Expose only the minimum context needed for classification.
+Never expose secrets, unrelated tenant data, or unnecessary personal data.
+Never allow Groq to generate audit-critical numeric values.
+```
+
 **What Groq is allowed to do:**
 
 - Classify ambiguous SAP material descriptions (`"HSD GENSET FUEL"` → diesel).
