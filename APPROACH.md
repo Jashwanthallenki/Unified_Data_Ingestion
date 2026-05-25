@@ -5,7 +5,7 @@ This is my end-to-end thinking for the Breathe ESG Tech Intern assignment: how I
 The shorter design docs are referenced inline:
 
 - [MODEL.md](MODEL.md) — full data model walkthrough.
-- [DECISIONS.md](DECISIONS.md) — 14 numbered decisions with the "why".
+- [DECISIONS.md](DECISIONS.md) — 14 numbered decisions.
 - [TRADEOFFS.md](TRADEOFFS.md) — what I deliberately did not build.
 - [SOURCES.md](SOURCES.md) — per-source: research, sample data, what would break in production.
 - [PLAN.md](PLAN.md) — milestones, what shipped.
