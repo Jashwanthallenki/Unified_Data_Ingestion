@@ -1,0 +1,59 @@
+{
+  "provider": "MockCorpTravel",
+  "schema_version": "1.0",
+  "trips": [
+    {
+      "trip_id": "UPLOAD-TEST-001",
+      "traveler_email": "uploaded.user@example.com",
+      "start_date": "2025-03-10",
+      "end_date": "2025-03-12",
+      "segments": [
+        {
+          "segment_id": "SEG-UPLOAD-001-A",
+          "segment_type": "flight",
+          "leg_id": "LEG-UPLOAD-001",
+          "booking_status": "confirmed",
+          "carrier": "LH",
+          "flight_number": "LH401",
+          "origin_iata": "FRA",
+          "destination_iata": "JFK",
+          "departure_datetime": "2025-03-10T10:00:00Z",
+          "arrival_datetime": "2025-03-10T13:00:00Z",
+          "cabin_class": "economy",
+          "distance_km": 6191,
+          "amount": 850,
+          "currency": "USD"
+        },
+        {
+          "segment_id": "SEG-UPLOAD-001-B",
+          "segment_type": "hotel",
+          "booking_status": "confirmed",
+          "vendor": "Marriott NYC",
+          "check_in": "2025-03-10",
+          "check_out": "2025-03-12",
+          "room_count": 1,
+          "amount": 600,
+          "currency": "USD"
+        }
+      ]
+    },
+    {
+      "trip_id": "UPLOAD-TEST-002",
+      "traveler_email": "uploaded.user@example.com",
+      "start_date": "2025-04-05",
+      "end_date": "2025-04-05",
+      "segments": [
+        {
+          "segment_id": "SEG-UPLOAD-002-A",
+          "segment_type": "rideshare",
+          "booking_status": "confirmed",
+          "vendor": "Uber",
+          "service_date": "2025-04-05",
+          "distance_km": 18.4,
+          "amount": 24,
+          "currency": "USD"
+        }
+      ]
+    }
+  ]
+}

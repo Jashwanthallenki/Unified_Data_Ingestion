@@ -89,12 +89,21 @@ METHOD_CEILING: dict[str, int] = {
 }
 
 
-def score(activity: ActivityDraft) -> tuple[int, str]:
-    """Return (data_quality_score 0..100, confidence_level HIGH/MEDIUM/LOW/FAILED)."""
-    method = (activity.calculation_method or activity.emission_method or "").lower()
+def score_from_method_and_flags(
+    *,
+    calculation_method: str | None,
+    emission_method: str | None,
+    flags: list[str],
+    ignored_flags: set[str] | None = None,
+) -> tuple[int, str]:
+    """Return (data_quality_score 0..100, confidence_level) for method + flags."""
+    method = (calculation_method or emission_method or "").lower()
     base = METHOD_CEILING.get(method, 100)
+    ignored = ignored_flags or set()
     deduction = 0
-    for flag in activity.flags:
+    for flag in flags:
+        if flag in ignored:
+            continue
         deduction += DEDUCTIONS.get(flag, 0)
     score_val = max(0, base - deduction)
     if score_val >= 80:
@@ -106,6 +115,15 @@ def score(activity: ActivityDraft) -> tuple[int, str]:
     else:
         level = "FAILED"
     return score_val, level
+
+
+def score(activity: ActivityDraft) -> tuple[int, str]:
+    """Return (data_quality_score 0..100, confidence_level HIGH/MEDIUM/LOW/FAILED)."""
+    return score_from_method_and_flags(
+        calculation_method=activity.calculation_method,
+        emission_method=activity.emission_method,
+        flags=activity.flags,
+    )
 
 
 def apply(activity: ActivityDraft) -> None:

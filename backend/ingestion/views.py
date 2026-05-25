@@ -133,13 +133,15 @@ class TravelSyncView(APIView):
         end = _parse_date(request.data.get("end_date"))
 
         # Call the mock travel sync endpoint internally (no HTTP hop).
-        from mock_travel.views import _load_fixture, _trip_overlaps
+        # `get_all_trips()` returns bundled fixture trips + anything uploaded via
+        # POST /api/mock-travel/upload/ — so the sync button picks up uploaded data.
+        from mock_travel.views import get_all_trips, _trip_overlaps
 
-        fixture = _load_fixture()
+        all_trips = get_all_trips()
         if start or end:
-            trips = [t for t in fixture.get("trips", []) if _trip_overlaps(t, start, end)]
+            trips = [t for t in all_trips if _trip_overlaps(t, start, end)]
         else:
-            trips = list(fixture.get("trips", []))
+            trips = list(all_trips)
 
         tenant = get_tenant()
         ctx = LookupContext.load(tenant)

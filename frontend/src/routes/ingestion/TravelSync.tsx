@@ -1,7 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { mockTravelSync, travelSync } from "../../api/client";
+import {
+  mockTravelClearUploads,
+  mockTravelSync,
+  mockTravelUpload,
+  travelSync,
+} from "../../api/client";
+import type { MockTravelUploadResult } from "../../api/client";
 import type { IngestionBatch } from "../../api/types";
 import { StatusBadge } from "../../components/Badges";
 import PageHeader from "../../components/PageHeader";
@@ -22,6 +28,8 @@ type TravelTrip = {
 type TravelPreview = {
   total_count: number;
   returned_count: number;
+  fixture_trip_count?: number;
+  uploaded_trip_count?: number;
   trips: TravelTrip[];
 };
 
@@ -33,6 +41,8 @@ export default function TravelSync() {
   const [batch, setBatch] = useState<IngestionBatch | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadResult, setUploadResult] = useState<MockTravelUploadResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categories = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -44,6 +54,36 @@ export default function TravelSync() {
     }
     return counts;
   }, [preview]);
+
+  async function onUploadFile(file: File) {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await mockTravelUpload(file, file.name);
+      setUploadResult(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function onClearUploads() {
+    if (!confirm("Clear all uploaded trips? (The bundled fixture stays.)")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await mockTravelClearUploads();
+      setUploadResult(null);
+      setPreview(null);
+      alert(`Cleared ${result.deleted_count} uploaded trip(s).`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function onPreview() {
     setBusy(true);
@@ -78,12 +118,53 @@ export default function TravelSync() {
     <div>
       <PageHeader
         title="Guided travel sync"
-        description="Select a date range, preview the mocked Concur/Navan response, then normalize trips into reviewable ESG activity records."
+        description="Optionally upload a Concur/Navan-shaped JSON file into the mock platform, then sync a date range to normalize trips into reviewable ESG activity records."
       />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
-          <StepCard number={1} title="Select date range" description="Choose the trip window to request from the mock corporate travel API." complete={!!startDate && !!endDate}>
+          <StepCard
+            number={1}
+            title="Upload travel data (optional)"
+            description="Push a Concur/Navan-shaped JSON file into the mock travel platform. Uploaded trips append to the bundled fixture and will appear in the next sync."
+            complete={!!uploadResult && uploadResult.accepted_count > 0}
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/json,.json"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) onUploadFile(file);
+                }}
+                disabled={busy}
+                className="block text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
+              />
+              <button
+                type="button"
+                className="btn"
+                disabled={busy}
+                onClick={onClearUploads}
+              >
+                Clear uploaded trips
+              </button>
+            </div>
+            {uploadResult ? (
+              <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                Accepted {uploadResult.accepted_count} trip(s)
+                {uploadResult.rejected_count > 0 ? `, rejected ${uploadResult.rejected_count}` : ""}.
+                Total uploaded in mock platform: {uploadResult.total_uploaded_count}.
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-slate-500">
+                Expected shape: <code>{"{ \"trips\": [...] }"}</code> (Concur/Navan-like) or a bare JSON array of trip objects.
+                Each trip needs at least <code>trip_id</code> or <code>segments</code>.
+              </p>
+            )}
+          </StepCard>
+
+          <StepCard number={2} title="Select date range" description="Choose the trip window to request from the mock corporate travel API." complete={!!startDate && !!endDate}>
             <div className="grid gap-3 sm:grid-cols-2">
               <label>
                 <span className="label">Start date</span>
@@ -106,17 +187,21 @@ export default function TravelSync() {
             </div>
           </StepCard>
 
-          <StepCard number={2} title="Trigger mock API sync" description="Preview the trips the API would return before creating a batch." complete={!!preview}>
+          <StepCard number={3} title="Trigger mock API sync" description="Preview the trips the API would return before creating a batch." complete={!!preview}>
             <button className="btn" disabled={busy || !startDate || !endDate} onClick={onPreview}>
               {busy ? "Requesting preview..." : "Preview API response"}
             </button>
           </StepCard>
 
-          <StepCard number={3} title="Show returned categories" description="Confirm the returned travel categories before normalization." complete={!!preview}>
+          <StepCard number={4} title="Show returned categories" description="Confirm the returned travel categories before normalization." complete={!!preview}>
             {preview ? (
               <div>
                 <p className="text-sm text-slate-700">
-                  Mock API returned {preview.returned_count} of {preview.total_count} trips for this range.
+                  Mock API returned {preview.returned_count} of {preview.total_count} trips for this range
+                  {typeof preview.fixture_trip_count === "number" && typeof preview.uploaded_trip_count === "number" ? (
+                    <> (<span className="font-medium">{preview.fixture_trip_count}</span> bundled + <span className="font-medium">{preview.uploaded_trip_count}</span> uploaded in the pool)</>
+                  ) : null}
+                  .
                 </p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   {Object.entries(categories).map(([category, count]) => (
@@ -132,7 +217,7 @@ export default function TravelSync() {
             )}
           </StepCard>
 
-          <StepCard number={4} title="Start normalization" description="Create the ingestion batch and send uncertain rows to analyst review." complete={!!batch}>
+          <StepCard number={5} title="Start normalization" description="Create the ingestion batch and send uncertain rows to analyst review." complete={!!batch}>
             <button className="btn-primary" disabled={busy || !preview} onClick={onSync}>
               {busy ? "Starting normalization..." : "Start normalization"}
             </button>

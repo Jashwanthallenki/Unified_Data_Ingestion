@@ -9,7 +9,19 @@ import type {
   ReviewSummary,
 } from "./types";
 
-const BASE = ""; // same-origin; Vite dev server proxies /api → :8000
+const BASE = ""; // same-origin; Vite dev server proxies /api to :8000
+
+function parseErrorDetail(body: string): string {
+  if (!body) return "No response body returned.";
+  try {
+    const data = JSON.parse(body);
+    if (typeof data.detail === "string") return data.detail;
+    if (typeof data.error === "string") return data.error;
+    return JSON.stringify(data);
+  } catch {
+    return body;
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -23,13 +35,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
-    let detail: string;
-    try {
-      const data = await res.json();
-      detail = data.detail || JSON.stringify(data);
-    } catch {
-      detail = await res.text();
-    }
+    const body = await res.text();
+    const detail = parseErrorDetail(body);
     throw new Error(`${res.status} ${res.statusText}: ${detail}`);
   }
   if (res.status === 204) return undefined as unknown as T;
@@ -75,15 +82,45 @@ export function listBatchExclusions(id: string): Promise<Paginated<ExclusionRow>
   return request<Paginated<ExclusionRow>>(`/api/ingestion/batches/${id}/exclusions/`);
 }
 
-// -------- Mock travel preview --------
+// -------- Mock travel preview / upload --------
 
 export function mockTravelSync(start?: string, end?: string) {
   const params = new URLSearchParams();
   if (start) params.set("start_date", start);
   if (end) params.set("end_date", end);
-  return request<{ total_count: number; returned_count: number; trips: unknown[] }>(
+  return request<{
+    total_count: number;
+    returned_count: number;
+    fixture_trip_count?: number;
+    uploaded_trip_count?: number;
+    trips: unknown[];
+  }>(
     `/api/mock-travel/sync/${params.toString() ? `?${params.toString()}` : ""}`,
   );
+}
+
+export type MockTravelUploadResult = {
+  accepted_count: number;
+  rejected_count: number;
+  rejected: Array<{ index: number; reason: string }>;
+  total_uploaded_count: number;
+  source_label: string;
+};
+
+export function mockTravelUpload(file: File, sourceLabel?: string) {
+  const form = new FormData();
+  form.append("file", file);
+  if (sourceLabel) form.append("source_label", sourceLabel);
+  return request<MockTravelUploadResult>("/api/mock-travel/upload/", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export function mockTravelClearUploads() {
+  return request<{ deleted_count: number }>("/api/mock-travel/uploads/", {
+    method: "DELETE",
+  });
 }
 
 // -------- Review --------

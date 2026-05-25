@@ -781,7 +781,7 @@ The Render deployment provisions:
 Before first push, make the build script executable:
 
 ```bash
-git update-index --chmod=+x render-build.sh
+git update-index --chmod=+x render-build.sh   # one-time, before first push
 ```
 
 Then connect the GitHub repo to Render.

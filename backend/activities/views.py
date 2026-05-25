@@ -14,6 +14,7 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ingestion.services.confidence import score_from_method_and_flags
 from ingestion.services.tenant_resolver import get_tenant
 
 from .models import NormalizedActivity, ReviewLog, ValidationIssue
@@ -359,12 +360,11 @@ class ActivityAcceptLlmView(APIView):
             return Response({"detail": f"No LLM suggestion for field '{field}'."},
                             status=status.HTTP_404_NOT_FOUND)
         # Apply the suggestion
-        target_field = field
-        if field in ("fuel_type",):
-            target_field = "activity_subtype"
+        target_field = _llm_target_field(field)
+        suggested_value = _coerce_llm_value(field, match.get("suggested_value"))
         old = getattr(activity, target_field, None) if hasattr(activity, target_field) else None
         if hasattr(activity, target_field):
-            setattr(activity, target_field, match.get("suggested_value"))
+            setattr(activity, target_field, suggested_value)
             provenance = dict(activity.field_provenance or {})
             provenance[target_field] = {
                 "method": "ANALYST_OVERRIDDEN",
@@ -377,12 +377,28 @@ class ActivityAcceptLlmView(APIView):
         activity.llm_suggestions = [s for s in (activity.llm_suggestions or []) if s.get("field") != field]
         if not activity.llm_suggestions:
             activity.llm_suggestion_reviewed = True
+        old_quality = {
+            "data_quality_score": activity.data_quality_score,
+            "confidence_level": activity.confidence_level,
+        }
+        _refresh_quality_after_llm_review(activity)
+        new_quality = {
+            "data_quality_score": activity.data_quality_score,
+            "confidence_level": activity.confidence_level,
+        }
         user = _current_user()
         activity.save()
         _log(activity, "LLM_SUGGESTION_ACCEPTED", user,
              comment=match.get("reason"),
              old_value={"field": target_field, "value": str(old) if old is not None else None},
-             new_value=match)
+             new_value={
+                 **match,
+                 "applied_field": target_field,
+                 "applied_value": suggested_value,
+                 "old_quality": old_quality,
+                 "new_quality": new_quality,
+             })
+        _bump_batch_count(activity)
         return Response(NormalizedActivityDetailSerializer(activity).data)
 
 
@@ -402,9 +418,14 @@ class ActivityRejectLlmView(APIView):
         activity.llm_suggestions = [s for s in (activity.llm_suggestions or []) if s.get("field") != field]
         if not activity.llm_suggestions:
             activity.llm_suggestion_reviewed = True
+        _refresh_quality_after_llm_review(activity)
         user = _current_user()
-        activity.save(update_fields=["llm_suggestions", "llm_suggestion_reviewed", "updated_at"])
+        activity.save(update_fields=[
+            "llm_suggestions", "llm_suggestion_reviewed", "flags",
+            "data_quality_score", "confidence_level", "updated_at",
+        ])
         _log(activity, "LLM_SUGGESTION_REJECTED", user, comment=data.get("comment"), new_value=match)
+        _bump_batch_count(activity)
         return Response(NormalizedActivityDetailSerializer(activity).data)
 
 
@@ -443,8 +464,62 @@ def _bump_batch_count(activity: NormalizedActivity) -> None:
     """Recompute pending/approved/rejected/locked counts on the parent batch."""
     batch = activity.batch
     qs = NormalizedActivity.objects.filter(batch=batch)
+    activities = list(qs.values("flags", "confidence_level"))
     batch.pending_rows = qs.filter(review_status="PENDING").count()
     batch.approved_rows = qs.filter(review_status="APPROVED").count()
     batch.rejected_rows = qs.filter(review_status="REJECTED").count()
     batch.locked_rows = qs.filter(review_status="LOCKED").count()
-    batch.save(update_fields=["pending_rows", "approved_rows", "rejected_rows", "locked_rows", "updated_at"])
+    batch.flagged_rows = sum(1 for row in activities if row.get("flags"))
+    batch.suspicious_rows = sum(
+        1
+        for row in activities
+        if any(
+            flag in {"SUSPICIOUS_HIGH_QUANTITY", "SUSPICIOUS_HIGH_VALUE", "USAGE_SPIKE_AFTER_DAY_NORMALIZATION"}
+            for flag in (row.get("flags") or [])
+        )
+    )
+    batch.low_confidence_rows = sum(
+        1 for row in activities if row.get("confidence_level") in {"LOW", "FAILED"}
+    )
+    batch.llm_suggested_rows = sum(
+        1 for row in activities if "LLM_SUGGESTED_FIELD" in (row.get("flags") or [])
+    )
+    batch.save(update_fields=[
+        "pending_rows", "approved_rows", "rejected_rows", "locked_rows",
+        "flagged_rows", "suspicious_rows", "low_confidence_rows",
+        "llm_suggested_rows", "updated_at",
+    ])
+
+
+def _llm_target_field(field: str) -> str:
+    if field == "fuel_type":
+        return "activity_subtype"
+    if field == "is_esg_relevant":
+        return "eligibility_status"
+    if field == "spend_category":
+        return "activity_subtype"
+    return field
+
+
+def _coerce_llm_value(field: str, value):
+    if field == "is_esg_relevant":
+        if isinstance(value, bool):
+            return "ELIGIBLE" if value else "NOT_RELEVANT"
+        text = str(value).strip().lower()
+        if text in {"true", "yes", "eligible", "relevant", "esg_relevant"}:
+            return "ELIGIBLE"
+        if text in {"false", "no", "not_relevant", "not relevant", "irrelevant"}:
+            return "NOT_RELEVANT"
+        return "NEEDS_REVIEW"
+    return value
+
+
+def _refresh_quality_after_llm_review(activity: NormalizedActivity) -> None:
+    """Keep AI audit flags, but do not penalize reviewed AI suggestions."""
+    ignored_flags = {"LLM_SUGGESTED_FIELD"} if activity.llm_suggestion_reviewed else set()
+    activity.data_quality_score, activity.confidence_level = score_from_method_and_flags(
+        calculation_method=activity.calculation_method,
+        emission_method=activity.emission_method,
+        flags=list(activity.flags or []),
+        ignored_flags=ignored_flags,
+    )
