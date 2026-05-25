@@ -1,85 +1,557 @@
-# Breathe ESG — prototype
+# Breathe ESG — Prototype
 
-ESG data ingestion + analyst review. Django REST backend, React/TypeScript frontend, optional Groq LLM-assisted suggestions for low-confidence rows.
+ESG ingestion-control and analyst-review system for converting messy SAP, utility, and travel data into normalized, confidence-scored, provenance-tracked activity records before audit.
 
-Single seeded tenant (`Demo Enterprise Client`). No authentication — deliberate prototype scope, documented in [TRADEOFFS.md](TRADEOFFS.md).
+This is not a generic CRUD dashboard. The prototype focuses on the real data-trust problem in ESG workflows: deciding which source rows are relevant, which rows are incomplete or suspicious, which values were directly provided or derived, and which records an analyst can approve before audit lock.
+
+The app includes:
+
+- an ingestion console for SAP, utility, and travel inputs,
+- source-specific normalization and validation,
+- raw source record preservation,
+- confidence scoring and validation flags,
+- optional Groq suggestions for low-confidence rows,
+- an analyst review dashboard,
+- approval and audit-lock workflow.
+
+Single seeded tenant: `Demo Enterprise Client`.
+
+The app is intentionally unauthenticated for prototype simplicity. This is a deliberate scope choice and is explained in [TRADEOFFS.md](TRADEOFFS.md).
+
+---
+
+## Live Demo
+
+Add deployed app URL here:
+
+```txt
+https://<your-render-app>.onrender.com
+```
+
+Demo tenant:
+
+```txt
+Demo Enterprise Client
+```
+
+Seeded Django admin users:
+
+```txt
+admin / admin
+analyst / analyst
+```
+
+The main app UI is unauthenticated. The seeded users are mainly for Django admin and review-log attribution.
 
 ---
 
 ## Documentation
 
+I have kept the design rationale in separate documents so the project is easy to review beyond just the deployed app. These docs explain how I approached the assignment, how I modeled the data, what decisions I made, what I intentionally left out, and how I handled realistic source-specific edge cases.
+
 | Document | What it explains |
 |---|---|
-| [APPROACH.md](APPROACH.md) | End-to-end approach: problem framing, architecture, ingestion/review flow, Groq usage, tenant design, deployment. |
-| [MODEL.md](MODEL.md) | Tenants, batches, raw records, normalized activities, validation issues, provenance, confidence, review logs, audit lock. |
-| [DECISIONS.md](DECISIONS.md) | 14 numbered design decisions with reasoning + open questions for the PM. |
-| [TRADEOFFS.md](TRADEOFFS.md) | What I deliberately did not build, why, and what production would change. |
-| [SOURCES.md](SOURCES.md) | Per source: real-world format researched, sample-data choices, what would break in real deployment. |
-| [REAL_WORLD_DATA_TRAPS.md](REAL_WORLD_DATA_TRAPS.md) | Real-world ingestion traps: purchase vs consumption, estimated readings, cancellations, duplicates, reversals, LLM numeric hallucination. |
-| [PLAN.md](PLAN.md) | Build plan, shipped scope, milestones, future improvements. |
+| [APPROACH.md](APPROACH.md) | My end-to-end approach: problem understanding, architecture, ingestion-review flow, Groq usage, tenant design, and deployment approach. |
+| [MODEL.md](MODEL.md) | The core data model: tenants, ingestion batches, raw records, normalized activities, validation issues, provenance, confidence scoring, review logs, and audit lock. |
+| [DECISIONS.md](DECISIONS.md) | The key design decisions I made and the reasoning behind each one. |
+| [TRADEOFFS.md](TRADEOFFS.md) | The things I deliberately did not build, why I left them out, and what I would do in production. |
+| [SOURCES.md](SOURCES.md) | The research links and source-shape evidence I used for SAP, utility data, travel systems, Groq, and ESG platform design. |
+| [REAL_WORLD_DATA_TRAPS.md](REAL_WORLD_DATA_TRAPS.md) | The real-world ingestion traps I identified, such as purchase vs consumption, estimated readings, cancelled bookings, duplicates, reversals, and LLM numeric hallucination. |
+| [PLAN.md](PLAN.md) | The build plan, shipped scope, milestones, and future improvements. |
 
 ---
 
-## Tech stack
+## Prototype Scope and Intentional Limitations
 
-**Backend** — Python 3.11, Django 5 + Django REST Framework, `pandas` + `openpyxl` for CSV/XLSX parsing, `python-dateutil` for mixed date formats, `groq` SDK for the optional LLM layer, `psycopg` (Postgres) with SQLite fallback, `dj-database-url` for env-driven DB config, `whitenoise` for static-file serving, `gunicorn` in production.
+I made a few deliberate scope choices to keep the prototype focused on the assignment’s core evaluation areas: data model quality, realistic source handling, analyst review, and tradeoff clarity.
 
-**Frontend** — React 18 + TypeScript, Vite, React Router v6, Tailwind CSS. No data-fetching library — a thin `fetch` client in [`frontend/src/api/client.ts`](frontend/src/api/client.ts).
+| Area | Prototype choice | Why I chose it |
+|---|---|---|
+| Product structure | Ingestion and review are included in one application | This makes the demo easier to follow: upload data, see how it normalizes, then review the resulting records in the same flow. |
+| Frontend deployment | React is built as an SPA and served by Django through WhiteNoise | This gives reviewers one deployed URL and avoids CORS/frontend-backend environment issues during review. |
+| External integrations | SAP and utility use realistic CSV uploads; travel uses a mocked Concur/Navan-like API | Real SAP, utility, and travel integrations need credentials, OAuth, sandbox access, and client-specific setup. The prototype focuses on ingestion logic rather than external access setup. |
+| Tenant model | One seeded tenant: `Demo Enterprise Client` | The schema is tenant-scoped, but full tenant switching and tenant management UI are out of scope for the prototype. |
+| Authentication | No login for the app UI; seeded Django admin users only | The assignment is mainly about ingestion, modeling, review, and decisions. Full auth/RBAC would not improve the core data-trust workflow in a 4-day scope. |
+| Emissions engine | Minimal illustrative emission factors | The assignment states that the hard part is messy source data, not building a full carbon factor engine. |
+| LLM usage | Groq is optional and analyst-gated | Groq assists with low-confidence text classification only. It cannot invent quantities, dates, kWh, distances, or audit references. |
+| Processing model | Synchronous ingestion | Good enough for prototype fixture sizes. Production would use queues/workers for large files. |
 
-**Database** — SQLite locally, Postgres on Render. Models use `JSONField` for `raw_payload`, `flags`, `field_provenance`, and `locked_snapshot`. Cross-DB flag filtering: native `@>` on Postgres, `icontains` fallback on SQLite.
-
-**Deploy** — Render web service + Postgres add-on via [`render.yaml`](render.yaml); `Procfile` fallback for Heroku-style providers (Railway, Fly.io). Single-origin: Django serves `/api/*` and the built SPA from the same host — no CORS config.
+These are not accidental gaps. They are scope boundaries I chose so the prototype could go deeper on source-specific ingestion, normalization, validation, provenance, and analyst review.
 
 ---
 
-## How it works
+## Tech Stack
 
-### Request lifecycle (ingestion)
+**Backend**
 
+- Python 3.11
+- Django 5
+- Django REST Framework
+- PostgreSQL on Render
+- SQLite fallback for local development
+- `pandas` and `openpyxl` for CSV/XLSX parsing
+- `python-dateutil` for mixed date formats
+- `groq` SDK for optional LLM suggestions
+- `psycopg` for Postgres
+- `dj-database-url` for environment-driven database config
+- `whitenoise` for static-file serving
+- `gunicorn` in production
+
+**Frontend**
+
+- React 18
+- Vite
+- TypeScript
+- React Router
+- Tailwind CSS
+- Thin fetch client in [`frontend/src/api/client.ts`](frontend/src/api/client.ts)
+
+**Database**
+
+- PostgreSQL in deployment
+- SQLite fallback locally
+- `JSONField` used for `raw_payload`, `flags`, `field_provenance`, `llm_suggestions`, and `locked_snapshot`
+
+**Deployment**
+
+- Render web service
+- Render PostgreSQL add-on
+- Single-origin deployment
+- Django serves both `/api/*` and the built React SPA from the same host
+- No CORS setup required
+
+---
+
+## Architecture at a Glance
+
+The prototype has two connected workflows:
+
+```txt
+/ingestion
+  → upload or sync source data
+  → preserve raw rows
+  → apply source-specific rules
+  → normalize into activity records
+  → assign confidence and validation flags
+
+/review
+  → inspect normalized records
+  → compare raw vs normalized data
+  → review validation issues and provenance
+  → accept/reject Groq suggestions
+  → approve or lock records for audit
 ```
-HTTP POST  →  view  →  adapter            →  orchestrator        →  DB
-(file/JSON)    (parse  (source-specific      (one transaction:       (IngestionBatch
-              + dispatch) parsing, eligibility filter,  RawRecord + NormalizedActivity   + RawRecord
-                          unit normalization, lookup     + ValidationIssue, then bump   + NormalizedActivity
-                          enrichment, confidence score,  batch funnel counts)            + ValidationIssue)
-                          flag generation → ActivityDraft)
+
+The same Django backend powers both workflows. The React SPA provides the analyst-facing interface, while Django REST Framework exposes the APIs for ingestion, review, Groq suggestions, and mock travel sync.
+
+For deployment, the React frontend is built into static assets and served from Django using WhiteNoise. This keeps the deployed prototype single-origin:
+
+```txt
+/                         → React SPA
+/ingestion                → React route
+/review                   → React route
+/api/*                    → Django REST API
+/api/mock-travel/sync/    → mocked travel source
+/admin/                   → Django admin
 ```
 
-**Three adapters**, one per source — [`backend/ingestion/adapters/`](backend/ingestion/adapters/):
+In production, the frontend and backend can be separated later without changing the core data model or API design.
+
+---
+
+## Why This Is More Than CRUD
+
+A simple CRUD app would store uploaded rows and show them in a table.
+
+This prototype does more than that.
+
+For every source row, the system asks:
+
+- Is this row ESG-relevant?
+- Is it actual activity or only an accounting/payment/inventory record?
+- Is it duplicated, reversed, cancelled, estimated, or incomplete?
+- Can the unit, date/period, facility, and activity type be normalized safely?
+- Which values came directly from the source?
+- Which values came from deterministic rules?
+- Which values are missing or AI-suggested?
+- Should an analyst approve, reject, request clarification, or lock the record?
+
+That is why the system separates:
+
+- `RawRecord` — what the client originally sent,
+- `NormalizedActivity` — the ESG-ready representation,
+- `ValidationIssue` — why the row may be risky,
+- `field_provenance` — how each value was derived,
+- `ReviewLog` — what the analyst did,
+- `locked_snapshot` — the frozen audit-ready version.
+
+---
+
+## How It Works
+
+### Request Lifecycle: Ingestion
+
+```txt
+HTTP POST
+  → view
+  → source adapter
+  → ingestion orchestrator
+  → database transaction
+```
+
+More specifically:
+
+```txt
+Source file / sync trigger
+  → parse request
+  → source-specific adapter
+  → eligibility filtering
+  → unit/date/period normalization
+  → lookup enrichment
+  → validation flags
+  → confidence scoring
+  → RawRecord + NormalizedActivity + ValidationIssue persistence
+  → batch funnel counts update
+```
+
+Every source row is preserved as a `RawRecord`, even when the row fails parsing or is intentionally excluded.
+
+---
+
+## Source Adapters
+
+The source-specific ingestion logic lives in:
+
+```txt
+backend/ingestion/adapters/
+```
 
 | Adapter | Input | What it owns |
 |---|---|---|
-| [`sap.py`](backend/ingestion/adapters/sap.py) | MB51 / ME2M CSV or XLSX | German+English header detection, EU/US numeric sniffing, `MovementTypeMapping` filter (261/201→consumption, 101→purchase, 311/301→excluded, 551→review, 262→reversal), reversal linking, plant + material lookup, unit normalization. |
-| [`utility.py`](backend/ingestion/adapters/utility.py) | Utility portal CSV | Charge-type filter (drop tax-only, late-fee-only, refund, adjustment), billing-period validation, **calendar-month pro-rata fan-out** (one row per overlapping month, scaled by `days_in_month / total_days`), estimated-reading capping, gas-row rejection, `MeterFacilityLookup` resolution. |
-| [`travel.py`](backend/ingestion/adapters/travel.py) | Concur/Navan-shaped JSON | Per-segment normalization (flight/hotel/car/rail/rideshare), cancellation/refund/void filtering, leg grouping by `leg_id`, codeshare dedup, distance resolution (provided → haversine via `AirportLookup` → MISSING; LLM never invents distance), hotel room-nights = `(checkout − checkin) × rooms`, cabin-class defaults. |
+| [`sap.py`](backend/ingestion/adapters/sap.py) | MB51 / ME2M CSV or XLSX | German/English header detection, EU/US number parsing, movement-type filtering, purchase vs consumption handling, reversal linking, plant/material lookup, unit normalization. |
+| [`utility.py`](backend/ingestion/adapters/utility.py) | Utility portal CSV | Charge-type filtering, billing-period validation, calendar-month pro-rata, estimated-reading handling, gas-row rejection, meter-to-facility lookup. |
+| [`travel.py`](backend/ingestion/adapters/travel.py) | Concur/Navan-shaped JSON | Segment normalization, cancellation/refund filtering, leg grouping, codeshare deduplication, distance resolution, hotel room-night calculation, cabin-class mapping. |
 
-All three adapters return an `AdapterBatchResult` (list of `ActivityDraft` + `RawRecord` payloads + exclusion reasons). The orchestrator persists everything in one transaction.
-
-### Confidence + provenance
-
-[`backend/ingestion/services/confidence.py`](backend/ingestion/services/confidence.py) — every row starts at the method's ceiling (`fuel_based`=100, `spend_based`=60, etc.) and subtracts a fixed amount per flag. Final score bands into `HIGH` (80+) / `MEDIUM` (50–79) / `LOW` (30–49, LLM-eligible) / `FAILED` (<30). Every score is reconstructible from `flags` alone.
-
-`NormalizedActivity.field_provenance` is a per-field JSON map:
-```json
-{ "quantity":     { "method": "DIRECT",        "source_field": "Menge", "confidence": 1.0 },
-  "facility_name":{ "method": "RULE_BASED",    "rule": "PlantLookup:1000→Hamburg", "confidence": 0.95 },
-  "activity_subtype": { "method": "LLM_SUGGESTED", "confidence": 0.72, "reason": "…" } }
-```
-Trust hierarchy: `DIRECT > RULE_BASED > ANALYST_OVERRIDDEN > LLM_SUGGESTED > MISSING`.
-
-### Groq (optional)
-
-[`backend/activities/services/groq_suggestion.py`](backend/activities/services/groq_suggestion.py) — invoked only for `LOW`-band rows. JSON-mode call; response parser **drops any suggestion targeting a forbidden field** (`quantity`, `dates`, `document_number`, `distance_km`, `usage_kwh`, `amount`, …) — the numeric-vs-text boundary is enforced in code, not just in the prompt. Suggestions land in `field_provenance` as `LLM_SUGGESTED`; rows with unreviewed suggestions cannot be locked. Per-(raw_record, missing_fields) cache in `GroqSuggestionCache` prevents repeat paid calls. Missing `GROQ_API_KEY` → graceful `{ok: false}`, row stays in manual queue.
-
-### Approve vs lock
-
-Two distinct endpoints, two distinct timestamps. `approve` records analyst sign-off. `lock` freezes `field_provenance + flags + EF + co2e + version` into `locked_snapshot` JSON; mutations on locked rows return HTTP 409. See [MODEL.md](MODEL.md) for the full audit trail design.
+All adapters return an adapter result containing activity drafts, raw payloads, validation flags, and exclusion reasons. The orchestrator persists them in one transaction.
 
 ---
 
-## API reference
+## SAP Handling
 
-Base URL: `/api`. All responses are JSON. Tenant is resolved from `DEFAULT_TENANT_SLUG` env (single-tenant prototype).
+The SAP adapter focuses on realistic SAP onboarding exports:
+
+- MB51-like fuel movement export,
+- ME2M-like procurement fallback export.
+
+Main SAP rules:
+
+- `261` / `201` → fuel consumption,
+- `101` → goods receipt / fuel purchased, not direct emissions,
+- `301` / `311` → stock transfer, excluded from emissions,
+- `551` → scrapping/write-off, needs review,
+- `262` → reversal, linked and netted where possible,
+- unknown movement type → needs analyst review.
+
+The adapter also handles:
+
+- German and English headers,
+- mixed date formats,
+- European and US number formats,
+- plant lookup,
+- material lookup,
+- unit mapping,
+- duplicate documents,
+- suspicious high quantities,
+- spend-based fallback for weak procurement rows.
+
+---
+
+## Utility Handling
+
+The utility adapter focuses on electricity usage exports.
+
+Main utility rules:
+
+- `usage_kwh` is preferred over `total_amount`,
+- amount-only rows become low-confidence spend-based fallback,
+- billing periods are preserved,
+- billing periods crossing months are prorated by days,
+- `usage_per_day` is calculated for better spike detection,
+- estimated readings are flagged and capped in confidence,
+- overlapping billing periods are flagged as possible amended bills,
+- multiple meters per site are preserved and aggregated at query time,
+- tax-only, late-fee-only, deposit-only, payment-only rows are excluded,
+- gas rows inside electricity imports are rejected with `GAS_UTILITY_DATA_DETECTED`.
+
+This avoids treating utility bills as simple finance rows and keeps the focus on actual energy consumption quality.
+
+---
+
+## Travel Handling
+
+The travel flow is modeled as a Concur/Navan-like API sync.
+
+Travel categories include:
+
+- flights,
+- hotels,
+- car rentals,
+- rail,
+- rideshare/taxi,
+- expense-only rows,
+- cancelled/refunded/voided bookings.
+
+Main travel rules:
+
+- cancelled/refunded/voided records are stored as raw evidence but excluded from normalized activity,
+- expense-only rows without travel evidence are excluded,
+- flight legs are grouped using `leg_id`,
+- round trips are not double-counted when separate legs already exist,
+- flight distance is resolved from source distance or airport lookup,
+- the LLM is not allowed to invent flight distance,
+- hotel room-nights are calculated from check-in/check-out,
+- missing checkout blocks hotel-night calculation,
+- room-nights are not multiplied by employee count,
+- bundled packages are flagged for review,
+- rideshare amount-only rows are low confidence.
+
+---
+
+## Travel Sync Design: Pull-Only Prototype
+
+The current travel ingestion flow is intentionally **pull-only**.
+
+From the frontend, the user triggers:
+
+```http
+POST /api/ingestion/travel-sync/
+```
+
+with only a date range:
+
+```json
+{
+  "start_date": "2025-02-01",
+  "end_date": "2025-05-31"
+}
+```
+
+This POST does not send travel records into the system. It acts as a trigger for the backend to pull travel data.
+
+The backend then:
+
+1. reads the bundled travel fixture from `backend/fixtures/travel/mock_response.json`,
+2. filters the records by the requested date range,
+3. runs the records through the travel adapter,
+4. creates an `IngestionBatch`,
+5. stores `RawRecord`, `NormalizedActivity`, and `ValidationIssue` rows.
+
+So the flow is:
+
+```txt
+Frontend date range
+→ POST /api/ingestion/travel-sync/
+→ backend pulls mock Concur/Navan-shaped data
+→ travel adapter normalizes records
+→ ingestion batch is created
+```
+
+The mock source endpoint is:
+
+```http
+GET /api/mock-travel/sync/
+```
+
+This endpoint is GET-only. It simulates a Concur/Navan-like travel provider API. It does not accept posted trip data.
+
+This is deliberate.
+
+The mock travel fixture is loaded from disk and cached in memory, so a POST to `/api/mock-travel/sync/` would have nowhere to persist new trip records. The endpoint exists to simulate a provider-side API that Breathe ESG pulls from, not a user-upload destination.
+
+This mirrors how real Concur/Navan-style integrations usually work. The ESG platform polls or syncs data from the provider API using a date range, rather than expecting the frontend to push trip rows manually.
+
+In this prototype:
+
+```txt
+/api/ingestion/travel-sync/  → trigger ingestion
+/api/mock-travel/sync/       → simulate external provider data
+```
+
+A future push-based path can be added cleanly if needed:
+
+```http
+POST /api/ingestion/travel/upload/
+```
+
+That endpoint could accept a Concur/Navan-shaped JSON body or uploaded JSON file, then pass the records into the existing `travel_adapter.adapt_travel()` function.
+
+The important part is that the adapter is transport-agnostic. It does not care whether travel records came from:
+
+- a mocked API pull,
+- a real Concur/Navan API pull,
+- a JSON upload,
+- or a scheduled background sync.
+
+The same normalized model and analyst review workflow would remain unchanged.
+
+---
+
+## Confidence and Provenance
+
+Every row receives a confidence score from `0–100`.
+
+The score starts from a method ceiling and subtracts fixed amounts for data-quality issues.
+
+Example method ceilings:
+
+| Method | Ceiling |
+|---|---:|
+| Fuel/activity-based | 100 |
+| Distance-based / location-based Scope 2 | 95 |
+| Room-night-based | 90 |
+| Spend-based fallback | 60 |
+
+Confidence bands:
+
+| Score | Band | Meaning |
+|---:|---|---|
+| 80–100 | HIGH | Mostly complete; ready for analyst approval. |
+| 50–79 | MEDIUM | Usable, but review needed. |
+| 30–49 | LOW | Risky; may be eligible for Groq suggestion if enough context exists. |
+| <30 | FAILED | Not safely normalizable. |
+
+Every score is reconstructible from flags, which makes it explainable.
+
+`NormalizedActivity.field_provenance` stores how each important value was derived:
+
+```json
+{
+  "quantity": {
+    "method": "DIRECT",
+    "source_field": "Menge",
+    "confidence": 1.0
+  },
+  "facility_name": {
+    "method": "RULE_BASED",
+    "rule": "PlantLookup:1000→Hamburg",
+    "confidence": 0.95
+  },
+  "activity_subtype": {
+    "method": "LLM_SUGGESTED",
+    "confidence": 0.72,
+    "reason": "Material description contains HSD and genset fuel"
+  }
+}
+```
+
+Trust hierarchy:
+
+```txt
+DIRECT > RULE_BASED > ANALYST_OVERRIDDEN > LLM_SUGGESTED > MISSING
+```
+
+---
+
+## Groq LLM Suggestions
+
+Groq is optional and used only as an assisted reasoning layer.
+
+The Groq service lives in:
+
+```txt
+backend/activities/services/groq_suggestion.py
+```
+
+It is invoked only for low-confidence rows or when explicitly requested by the analyst.
+
+Groq receives:
+
+- raw source payload,
+- partially normalized record,
+- missing fields,
+- validation flags,
+- available lookup context,
+- confidence score.
+
+Groq may suggest:
+
+- material category,
+- fuel type,
+- spend category,
+- ESG relevance,
+- scope category,
+- review explanation,
+- analyst follow-up.
+
+Groq must not generate:
+
+- quantities,
+- dates,
+- document numbers,
+- invoice numbers,
+- bill numbers,
+- ticket numbers,
+- kWh,
+- flight distance,
+- hotel nights,
+- audit references.
+
+The response parser drops suggestions for forbidden fields. This guardrail is enforced in code, not only in the prompt.
+
+Suggestions are stored as `LLM_SUGGESTED`. They do not become final values until an analyst accepts them.
+
+If `GROQ_API_KEY` is missing or Groq fails, the row stays in manual review and ingestion continues.
+
+---
+
+## Approve vs Lock
+
+Approval and audit lock are separate actions.
+
+**Approve**
+
+Means the analyst reviewed the row and accepts it.
+
+**Lock**
+
+Means the approved row becomes frozen evidence.
+
+Locked rows cannot be silently changed. Mutations on locked rows return HTTP `409`.
+
+The lock stores a `locked_snapshot` containing:
+
+- approved user and timestamp,
+- raw record reference,
+- field provenance,
+- validation flags,
+- emission factor and version,
+- `co2e_kg`,
+- active validation issues,
+- review comments.
+
+This lets the system answer later:
+
+```txt
+What was approved?
+Who approved it?
+What source data was it based on?
+Which rules or suggestions created the values?
+What factor version was used?
+```
+
+---
+
+## API Reference
+
+Base URL:
+
+```txt
+/api
+```
+
+All responses are JSON.
+
+Tenant is resolved from `DEFAULT_TENANT_SLUG` in this single-tenant prototype.
 
 ### Health
 
@@ -87,122 +559,296 @@ Base URL: `/api`. All responses are JSON. Tenant is resolved from `DEFAULT_TENAN
 |---|---|---|
 | `GET` | `/healthz/` | `{ "status": "ok" }` |
 
-### Ingestion — [`backend/ingestion/urls.py`](backend/ingestion/urls.py)
+### Ingestion
 
 | Method | Path | Body / Params | Response |
 |---|---|---|---|
-| `POST` | `/ingestion/sap/upload/` | multipart: `file` (CSV/XLSX), `kind` (`mb51` \| `me2m`) | `IngestionBatch` with funnel counts |
-| `POST` | `/ingestion/utility/upload/` | multipart: `file` (CSV) | `IngestionBatch` |
-| `POST` | `/ingestion/travel-sync/` | JSON: `{ "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD" }` | `IngestionBatch` (calls the mock travel API internally) |
-| `GET` | `/ingestion/batches/` | — | List of batches with status + counts |
-| `GET` | `/ingestion/batches/<uuid>/` | — | Single batch + lookup-version snapshot |
-| `GET` | `/ingestion/batches/<uuid>/raw-records/` | — | All raw rows for the batch (including failed/excluded) |
-| `GET` | `/ingestion/batches/<uuid>/exclusions/` | — | Raw rows grouped by `exclusion_reason` |
+| `POST` | `/ingestion/sap/upload/` | multipart: `file`, `kind` = `mb51` or `me2m` | `IngestionBatch` |
+| `POST` | `/ingestion/utility/upload/` | multipart: `file` | `IngestionBatch` |
+| `POST` | `/ingestion/travel-sync/` | JSON date range | `IngestionBatch` |
+| `GET` | `/ingestion/batches/` | — | list of batches |
+| `GET` | `/ingestion/batches/<uuid>/` | — | batch detail |
+| `GET` | `/ingestion/batches/<uuid>/raw-records/` | — | raw rows |
+| `GET` | `/ingestion/batches/<uuid>/exclusions/` | — | exclusion reasons |
 
-### Review — [`backend/activities/urls.py`](backend/activities/urls.py)
-
-| Method | Path | Body / Params | Response |
-|---|---|---|---|
-| `GET` | `/review/summary/` | — | Aggregate counts: pending/approved/rejected/locked, low-confidence, suspicious |
-| `GET` | `/review/activities/` | query: `source`, `batch`, `status`, `eligibility`, `confidence`, `flag`, `suspicious=1`, `locked=1`, `search` | List of `NormalizedActivity` |
-| `GET` | `/review/activities/<uuid>/` | — | Detail view: activity + raw record + issues + review log + LLM suggestions |
-| `POST` | `/review/activities/<uuid>/approve/` | `{ "comment"?: string }` | Updated activity. **409** if locked; **409** if unreviewed LLM suggestions exist |
-| `POST` | `/review/activities/<uuid>/reject/` | `{ "comment": string }` | Updated activity. **409** if locked |
-| `POST` | `/review/activities/<uuid>/mark-not-relevant/` | `{ "comment": string }` | Updated activity |
-| `POST` | `/review/activities/<uuid>/request-clarification/` | `{ "comment": string }` | Updated activity |
-| `POST` | `/review/activities/<uuid>/override/` | `{ "field": string, "new_value": any, "comment": string }` | Updated activity; `field_provenance[field].method` → `ANALYST_OVERRIDDEN` |
-| `POST` | `/review/activities/<uuid>/lock/` | — | Activity with `locked_snapshot` populated. **409** unless `review_status == "APPROVED"` and no unreviewed LLM suggestions |
-| `POST` | `/review/activities/<uuid>/groq-suggest/` | `{ "force"?: boolean }` | `{ ok, cached, model, suggestions[], notes[] }`. Only LOW/MEDIUM by default; `force=true` to override |
-| `POST` | `/review/activities/<uuid>/accept-llm-suggestion/` | `{ "field": string }` | Suggestion applied; provenance flips to `ANALYST_OVERRIDDEN` |
-| `POST` | `/review/activities/<uuid>/reject-llm-suggestion/` | `{ "field": string }` | Suggestion removed from `llm_suggestions` |
-
-### Mock travel — [`backend/mock_travel/urls.py`](backend/mock_travel/urls.py)
+### Review
 
 | Method | Path | Body / Params | Response |
 |---|---|---|---|
-| `GET` | `/mock-travel/sync/` | query: `start_date`, `end_date` | Concur/Navan-shaped JSON. Same endpoint the travel ingester calls internally; exposed so you can also inspect the raw shape. |
+| `GET` | `/review/summary/` | — | aggregate review counts |
+| `GET` | `/review/activities/` | filters: `source`, `batch`, `status`, `eligibility`, `confidence`, `flag`, `suspicious`, `locked`, `search` | activity list |
+| `GET` | `/review/activities/<uuid>/` | — | activity detail |
+| `POST` | `/review/activities/<uuid>/approve/` | optional comment | updated activity |
+| `POST` | `/review/activities/<uuid>/reject/` | required comment | updated activity |
+| `POST` | `/review/activities/<uuid>/mark-not-relevant/` | required comment | updated activity |
+| `POST` | `/review/activities/<uuid>/request-clarification/` | required comment | updated activity |
+| `POST` | `/review/activities/<uuid>/override/` | field, new value, comment | updated activity |
+| `POST` | `/review/activities/<uuid>/lock/` | — | locked activity |
+| `POST` | `/review/activities/<uuid>/groq-suggest/` | optional `force` | Groq suggestion result |
+| `POST` | `/review/activities/<uuid>/accept-llm-suggestion/` | field | suggestion accepted |
+| `POST` | `/review/activities/<uuid>/reject-llm-suggestion/` | field | suggestion rejected |
 
-Example:
+### Mock Travel
+
+| Method | Path | Body / Params | Response |
+|---|---|---|
+| `GET` | `/mock-travel/sync/` | query: `start_date`, `end_date` | Concur/Navan-shaped JSON |
+
+---
+
+## Example API Calls
 
 ```bash
 curl http://localhost:8000/api/healthz/
+```
 
+```bash
 curl -X POST http://localhost:8000/api/ingestion/sap/upload/ \
-  -F "file=@backend/fixtures/sap/sap_mb51_fuel_movements.csv" -F "kind=mb51"
+  -F "file=@backend/fixtures/sap/sap_mb51_fuel_movements.csv" \
+  -F "kind=mb51"
+```
 
+```bash
 curl "http://localhost:8000/api/review/activities/?source=sap&confidence=MEDIUM"
+```
 
+```bash
 curl -X POST http://localhost:8000/api/review/activities/<UUID>/approve/ \
-  -H "Content-Type: application/json" -d '{"comment":"Verified against source"}'
+  -H "Content-Type: application/json" \
+  -d '{"comment":"Verified against source"}'
+```
 
+```bash
 curl -X POST http://localhost:8000/api/review/activities/<UUID>/lock/
 ```
 
 ---
 
-## Run locally
+## Run Locally
+
+### 1. Setup Python environment
 
 ```powershell
-# Once
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r backend\requirements.txt
-cd frontend; npm install; cd ..
-
-# Migrate + seed (SQLite by default; set DATABASE_URL for Postgres)
-python backend\manage.py migrate
-python backend\manage.py seed_tenant     # Demo Enterprise Client + analyst/admin users
-python backend\manage.py load_lookups    # all fixture CSVs
-
-# Dev mode: Vite at :5173 proxies /api → :8000
-python backend\manage.py runserver 8000
-cd frontend; npm run dev
 ```
 
-Single-origin mode (Django serves the built SPA on `:8000`):
+### 2. Setup frontend
 
 ```powershell
-cd frontend; npm run build; cd ..
+cd frontend
+npm install
+cd ..
+```
+
+### 3. Migrate and seed
+
+SQLite is used by default locally. Set `DATABASE_URL` to use Postgres.
+
+```powershell
+python backend\manage.py migrate
+python backend\manage.py seed_tenant
+python backend\manage.py load_lookups
+```
+
+### 4. Run in development mode
+
+Backend:
+
+```powershell
+python backend\manage.py runserver 8000
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Vite runs on `:5173` and proxies `/api` to Django on `:8000`.
+
+---
+
+## Single-Origin Local Mode
+
+To test Django serving the built React SPA:
+
+```powershell
+cd frontend
+npm run build
+cd ..
 python backend\manage.py collectstatic --noinput
 python backend\manage.py runserver 8000
 ```
 
-**Smoke test (no DB writes):** `python backend\manage.py smoke_adapters` — runs all three adapters against the bundled fixtures and prints funnel counts.
+Then open:
 
-**Environment variables**
+```txt
+http://localhost:8000
+```
 
-| Var | Purpose | Default |
+---
+
+## Smoke Test
+
+Run all adapters against bundled fixtures without DB writes:
+
+```powershell
+python backend\manage.py smoke_adapters
+```
+
+This prints funnel counts for SAP, utility, and travel fixture data.
+
+---
+
+## Environment Variables
+
+| Variable | Purpose | Default |
 |---|---|---|
 | `DATABASE_URL` | Postgres connection string | SQLite at `backend/db.sqlite3` |
 | `DJANGO_SECRET_KEY` | Django secret | dev-only fallback |
-| `DJANGO_DEBUG` | `1` enables debug | `1` locally, `0` on Render |
-| `DJANGO_ALLOWED_HOSTS` | Comma-separated | `*` locally |
-| `DEFAULT_TENANT_SLUG` / `DEFAULT_TENANT_NAME` | Seeded tenant | `demo-enterprise-client` / `Demo Enterprise Client` |
-| `GROQ_API_KEY` | Enables LLM suggestions | unset → graceful no-op |
+| `DJANGO_DEBUG` | Enables debug when `1` | `1` locally, `0` on Render |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated allowed hosts | `*` locally |
+| `DEFAULT_TENANT_SLUG` | Default tenant slug | `demo-enterprise-client` |
+| `DEFAULT_TENANT_NAME` | Default tenant name | `Demo Enterprise Client` |
+| `GROQ_API_KEY` | Enables Groq suggestions | unset → graceful no-op |
 | `GROQ_MODEL` | Groq model id | `llama-3.3-70b-versatile` |
 | `GROQ_TIMEOUT_S` | Groq call timeout | `20` |
 
-**Seeded users** (Django admin only — the app itself is unauthenticated):
-- `admin` / `admin` — superuser
-- `analyst` / `analyst` — implicit reviewer on every `ReviewLog` entry
+---
+
+## Seeded Users
+
+These are for Django admin / review-log attribution.
+
+```txt
+admin / admin
+analyst / analyst
+```
+
+The main app UI itself is intentionally unauthenticated.
 
 ---
 
-## Click-through (with servers running)
+## Click-Through Demo
 
-1. `/ingestion` → SAP → upload [`sap_mb51_fuel_movements.csv`](backend/fixtures/sap/sap_mb51_fuel_movements.csv) (kind = mb51).
-2. Utility → upload [`utility_electricity_export.csv`](backend/fixtures/utility/utility_electricity_export.csv).
-3. Travel → date range `2025-02-01` → `2025-05-31`.
-4. `/review` summary cards link to filtered activity views.
-5. `/review/activities` → filter `Confidence = LOW` → open one → **Groq suggest** → accept/reject suggestion.
-6. On any row: **Approve** → **Lock** → confirm the activity detail shows the `locked_snapshot`.
+With servers running:
+
+1. Go to `/ingestion`.
+2. Upload SAP fixture:
+   - [`backend/fixtures/sap/sap_mb51_fuel_movements.csv`](backend/fixtures/sap/sap_mb51_fuel_movements.csv)
+   - kind = `mb51`
+3. Upload utility fixture:
+   - [`backend/fixtures/utility/utility_electricity_export.csv`](backend/fixtures/utility/utility_electricity_export.csv)
+4. Run travel sync:
+   - start date: `2025-02-01`
+   - end date: `2025-05-31`
+5. Open `/ingestion/batches` and inspect batch counts.
+6. Open `/review`.
+7. Filter for low-confidence or suspicious rows.
+8. Open a record detail page.
+9. Compare original source row vs normalized activity record.
+10. Inspect validation issues and field provenance.
+11. Trigger Groq suggestion if available.
+12. Accept or reject suggestion.
+13. Approve the record.
+14. Lock the approved record.
+15. Confirm the record shows `locked_snapshot`.
 
 ---
 
-## Deploy (Render)
+## Deploy on Render
 
-Push to a GitHub repo connected to Render. The included [`render.yaml`](render.yaml) provisions a free-tier Postgres + Python web service; [`render-build.sh`](render-build.sh) runs `pip install → npm build → collectstatic → migrate → seed_tenant → load_lookups`. Add `GROQ_API_KEY` as a dashboard env var to enable LLM suggestions (the app runs without it).
+The repository includes:
+
+```txt
+render.yaml
+render-build.sh
+Procfile
+```
+
+The Render deployment provisions:
+
+- one Python web service,
+- one Render PostgreSQL database,
+- frontend build served by Django through WhiteNoise,
+- database migrations,
+- tenant seeding,
+- lookup loading.
+
+Before first push, make the build script executable:
 
 ```bash
-git update-index --chmod=+x render-build.sh   # one-time, before first push
+git update-index --chmod=+x render-build.sh
 ```
+
+Then connect the GitHub repo to Render.
+
+Add `GROQ_API_KEY` in the Render dashboard if you want LLM suggestions enabled. The app still works without it.
+
+Production start command:
+
+```bash
+cd backend && gunicorn breathe_esg.wsgi --bind 0.0.0.0:$PORT --workers 2 --log-file -
+```
+
+---
+
+## Deployment Choice
+
+I deployed the prototype as a single Render web service backed by Render PostgreSQL.
+
+This means Django serves both:
+
+- the REST API under `/api/*`,
+- the built React SPA through WhiteNoise.
+
+I chose this because it keeps the review experience simple: one deployed URL, one backend, one database, no CORS setup, and no separate frontend hosting configuration.
+
+This is a prototype deployment choice, not a production architecture requirement.
+
+In production, I would likely split the system into:
+
+- frontend on Vercel/Cloudflare/CDN,
+- Django API service,
+- background workers for ingestion,
+- object storage for uploaded files,
+- managed PostgreSQL,
+- secure secret management,
+- tenant-aware auth and RBAC.
+
+---
+
+## What To Look For During Review
+
+The most important parts of this prototype are not the visuals alone. The main things to inspect are:
+
+1. **Ingestion batches** — each upload/sync creates a batch with counts for raw, normalized, excluded, failed, suspicious, and low-confidence rows.
+2. **Raw vs normalized view** — every normalized activity links back to the original source row.
+3. **Source-specific rules** — SAP movement types, utility billing periods, and travel booking statuses are handled differently.
+4. **Validation issues** — suspicious or incomplete rows are surfaced instead of hidden.
+5. **Field provenance** — the analyst can see whether a value was direct, rule-based, missing, overridden, or suggested by Groq.
+6. **Groq guardrails** — Groq suggestions are advisory and cannot create audit-critical numeric values.
+7. **Approval vs lock** — approval records analyst sign-off; lock freezes the record for audit.
+
+---
+
+## Final Project Positioning
+
+This prototype converts messy client activity data into analyst-ready ESG records.
+
+It ingests SAP, utility, and travel inputs, stores raw evidence, applies source-specific rules, normalizes units and periods, handles duplicate/reversal/cancellation cases, flags suspicious or low-confidence rows, uses Groq only for safe text-based suggestions, and gives analysts a dashboard to approve, reject, or lock records for audit.
+
+The core value is the ingestion-control layer:
+
+```txt
+Not every row is ESG activity.
+Not every purchase is consumption.
+Not every bill amount is energy usage.
+Not every booking is travel.
+Not every missing value should be guessed.
+```
+
+That is why this system focuses on provenance, confidence, validation, and analyst control before audit lock.
