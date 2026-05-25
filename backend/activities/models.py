@@ -84,6 +84,14 @@ class NormalizedActivity(models.Model):
 
     # Dedup / reversal / estimate flags
     is_duplicate = models.BooleanField(default=False)
+    duplicate_of_activity = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="duplicate_activities",
+    )
+    duplicate_reason = models.CharField(max_length=255, null=True, blank=True)
     is_reversal = models.BooleanField(default=False)
     reversal_of = models.CharField(max_length=128, null=True, blank=True)
     is_estimate = models.BooleanField(default=False)
@@ -182,6 +190,10 @@ class ReviewLog(models.Model):
         ("LLM_SUGGESTION_ACCEPTED", "LLM suggestion accepted"),
         ("LLM_SUGGESTION_REJECTED", "LLM suggestion rejected"),
         ("VALUE_OVERRIDDEN", "Value overridden"),
+        ("MARKED_DUPLICATE", "Marked duplicate"),
+        ("MARKED_NOT_DUPLICATE", "Marked not duplicate"),
+        ("USE_AS_SOURCE_OF_TRUTH", "Use as source of truth"),
+        ("IGNORED_DUPLICATE", "Ignored duplicate"),
     ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="review_logs")

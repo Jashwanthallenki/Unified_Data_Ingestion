@@ -11,6 +11,23 @@ const overrideFields = [
   "emission_method",
 ];
 
+const duplicateFlags = new Set([
+  "DUPLICATE_FILE_UPLOAD",
+  "DUPLICATE_ROW_IN_BATCH",
+  "CROSS_BATCH_DUPLICATE",
+  "DUPLICATE_DOCUMENT",
+  "DUPLICATE_SAP_ROW",
+  "DUPLICATE_BILL_ACCOUNT_PERIOD",
+  "OVERLAPPING_BILLING_PERIOD",
+  "POSSIBLE_AMENDED_BILL",
+  "DUPLICATE_TRAVEL_EVENT",
+  "POSSIBLE_CODESHARE_DUPLICATE",
+  "DUPLICATE_FUEL_SOURCE",
+  "DOUBLE_COUNT_RISK",
+  "REQUIRES_RECONCILIATION",
+  "DUPLICATE_TRAVEL_SYNC",
+]);
+
 export default function ActionBar({
   activity,
   busy,
@@ -32,7 +49,12 @@ export default function ActionBar({
   const [field, setField] = useState("activity_subtype");
   const [value, setValue] = useState("");
   const locked = !!activity.locked_at || activity.review_status === "LOCKED";
-  const canLock = activity.review_status === "APPROVED" && !locked;
+  const hasDuplicateRisk = activity.flags.some((flag) => duplicateFlags.has(flag));
+  const unresolvedDuplicate = activity.requires_reconciliation || (
+    hasDuplicateRisk && !["APPROVED", "MARKED_NOT_RELEVANT", "LOCKED"].includes(activity.review_status)
+  );
+  const requiresApproveComment = activity.requires_reconciliation;
+  const canLock = activity.review_status === "APPROVED" && !locked && !unresolvedDuplicate;
   const currentValue = (activity as unknown as Record<string, unknown>)[field];
 
   return (
@@ -47,11 +69,16 @@ export default function ActionBar({
               disabled={locked || busy}
               onChange={(event) => setComment(event.target.value)}
               className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-100"
-              placeholder="Required for reject, clarification, and override. Optional for approval."
+              placeholder="Required for reject, clarification, override, and unresolved duplicate reconciliation. Optional for normal approval."
             />
           </label>
           <div className="flex flex-wrap gap-2">
-            <button className="btn-primary" disabled={busy || locked} onClick={() => onApprove(comment || undefined)}>
+            <button
+              className="btn-primary"
+              disabled={busy || locked || (requiresApproveComment && !comment.trim())}
+              onClick={() => onApprove(comment || undefined)}
+              title={requiresApproveComment ? "Duplicate or reconciliation-risk rows require an analyst comment before approval." : undefined}
+            >
               Approve
             </button>
             <button className="btn-danger" disabled={busy || locked || !comment.trim()} onClick={() => onReject(comment.trim())}>
@@ -64,7 +91,7 @@ export default function ActionBar({
               className="btn"
               disabled={busy || locked || !canLock}
               onClick={onLock}
-              title="Audit lock: Locks an approved row so it cannot be silently changed later."
+              title={unresolvedDuplicate ? "Resolve duplicate/reconciliation context before audit lock." : "Audit lock: Locks an approved row so it cannot be silently changed later."}
             >
               Lock
             </button>

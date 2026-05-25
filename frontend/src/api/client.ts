@@ -1,4 +1,5 @@
 import type {
+  BatchDuplicateInfo,
   ExclusionRow,
   GroqSuggestResponse,
   IngestionBatch,
@@ -80,6 +81,10 @@ export function listBatchRaw(id: string): Promise<Paginated<RawRecord>> {
 
 export function listBatchExclusions(id: string): Promise<Paginated<ExclusionRow>> {
   return request<Paginated<ExclusionRow>>(`/api/ingestion/batches/${id}/exclusions/`);
+}
+
+export function getBatchDuplicates(id: string): Promise<BatchDuplicateInfo> {
+  return request<BatchDuplicateInfo>(`/api/ingestion/batches/${id}/duplicates/`);
 }
 
 // -------- Mock travel preview / upload --------
@@ -179,5 +184,26 @@ export function acceptLlm(id: string, field: string) {
 export function rejectLlm(id: string, field: string, comment?: string) {
   return request<NormalizedActivityDetail>(`/api/review/activities/${id}/reject-llm-suggestion/`, {
     method: "POST", body: JSON.stringify({ field, comment }),
+  });
+}
+
+export function markDuplicate(id: string, comment: string) {
+  return request<NormalizedActivityDetail>(`/api/review/activities/${id}/mark-duplicate/`, {
+    method: "POST", body: JSON.stringify({ comment }),
+  });
+}
+export function markNotDuplicate(id: string, comment: string) {
+  return request<NormalizedActivityDetail>(`/api/review/activities/${id}/mark-not-duplicate/`, {
+    method: "POST", body: JSON.stringify({ comment }),
+  });
+}
+export function useAsSourceOfTruth(id: string, comment: string) {
+  return request<NormalizedActivityDetail>(`/api/review/activities/${id}/use-as-source-of-truth/`, {
+    method: "POST", body: JSON.stringify({ comment }),
+  });
+}
+export function ignoreDuplicate(id: string, comment: string) {
+  return request<NormalizedActivityDetail>(`/api/review/activities/${id}/ignore-duplicate/`, {
+    method: "POST", body: JSON.stringify({ comment }),
   });
 }

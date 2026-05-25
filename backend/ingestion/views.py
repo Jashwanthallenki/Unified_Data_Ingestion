@@ -3,33 +3,34 @@ from __future__ import annotations
 
 import csv
 import io
-import json
 from datetime import date
 
 from django.shortcuts import get_object_or_404
-from django.urls import reverse
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 
+from activities.models import NormalizedActivity
+from activities.serializers import NormalizedActivityListSerializer
 from .adapters import sap as sap_adapter
 from .adapters import travel as travel_adapter
 from .adapters import utility as utility_adapter
 from .models import IngestionBatch, RawRecord
 from .serializers import (
+    DuplicateRawRecordSerializer,
     ExclusionRowSerializer,
     IngestionBatchSerializer,
     RawRecordSerializer,
 )
+from .services.dedupe import hash_file, hash_rows_content
 from .services.lookup_context import LookupContext
 from .services.orchestrator import persist_batch
 from .services.tenant_resolver import get_tenant
 
 
-def _read_uploaded_csv(uploaded_file) -> list[dict]:
-    raw = uploaded_file.read()
+def _read_csv_bytes(raw) -> list[dict]:
     if isinstance(raw, bytes):
         # Strip UTF-8 BOM if present
         if raw.startswith(b"\xef\xbb\xbf"):
@@ -69,7 +70,8 @@ class SapUploadView(APIView):
                             status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            rows = _read_uploaded_csv(upload)
+            raw_bytes = upload.read()
+            rows = _read_csv_bytes(raw_bytes)
         except Exception as exc:  # pragma: no cover — defensive
             return Response({"detail": f"Failed to parse CSV: {exc}"},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -88,6 +90,8 @@ class SapUploadView(APIView):
             original_filename=upload.name,
             api_sync_range_start=None,
             api_sync_range_end=None,
+            file_hash=hash_file(raw_bytes),
+            content_hash=hash_rows_content(rows),
             adapter_result=adapter_result,
             ctx=ctx,
             notes=f"SAP {kind.upper()} upload; header={adapter_result.metadata.get('header_language')}",
@@ -103,7 +107,8 @@ class UtilityUploadView(APIView):
         if upload is None:
             return Response({"detail": "Missing file field 'file'."}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            rows = _read_uploaded_csv(upload)
+            raw_bytes = upload.read()
+            rows = _read_csv_bytes(raw_bytes)
         except Exception as exc:
             return Response({"detail": f"Failed to parse CSV: {exc}"},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -118,6 +123,8 @@ class UtilityUploadView(APIView):
             original_filename=upload.name,
             api_sync_range_start=None,
             api_sync_range_end=None,
+            file_hash=hash_file(raw_bytes),
+            content_hash=hash_rows_content(rows),
             adapter_result=adapter_result,
             ctx=ctx,
             notes="Utility electricity upload",
@@ -146,6 +153,7 @@ class TravelSyncView(APIView):
         tenant = get_tenant()
         ctx = LookupContext.load(tenant)
         adapter_result = travel_adapter.adapt_travel(trips, ctx)
+        sync_key = f"travel:{start.isoformat() if start else 'all'}:{end.isoformat() if end else 'all'}"
         batch = persist_batch(
             tenant=tenant,
             source_type="travel",
@@ -153,6 +161,7 @@ class TravelSyncView(APIView):
             original_filename=None,
             api_sync_range_start=start,
             api_sync_range_end=end,
+            sync_key=sync_key,
             adapter_result=adapter_result,
             ctx=ctx,
             notes=f"Travel sync {start} → {end}; {len(trips)} trips ingested",
@@ -204,3 +213,21 @@ class BatchExclusionsView(ListAPIView):
         return RawRecord.objects.filter(
             tenant=tenant, batch_id=self.kwargs["batch_id"],
         ).exclude(exclusion_reason__isnull=True).exclude(exclusion_reason="").order_by("row_number")
+
+
+class BatchDuplicatesView(APIView):
+    def get(self, request, batch_id, *args, **kwargs):
+        tenant = get_tenant()
+        batch = get_object_or_404(IngestionBatch, tenant=tenant, id=batch_id)
+        duplicate_raw = RawRecord.objects.filter(
+            tenant=tenant, batch=batch, is_duplicate_row=True,
+        ).order_by("row_number")
+        duplicate_activities = (
+            NormalizedActivity.objects.filter(tenant=tenant, batch=batch, is_duplicate=True)
+            | NormalizedActivity.objects.filter(tenant=tenant, batch=batch, requires_reconciliation=True)
+        ).distinct().order_by("-created_at")
+        return Response({
+            "batch": IngestionBatchSerializer(batch).data,
+            "duplicate_raw_rows": DuplicateRawRecordSerializer(duplicate_raw, many=True).data,
+            "duplicate_activities": NormalizedActivityListSerializer(duplicate_activities, many=True).data,
+        })

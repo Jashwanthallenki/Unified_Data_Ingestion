@@ -32,6 +32,10 @@ export default function BatchTable({ batches, loading }: { batches: IngestionBat
             <th>Failed</th>
             <th>Low confidence</th>
             <th>AI suggested</th>
+            <th>Duplicate file?</th>
+            <th>Duplicate of batch</th>
+            <th>Duplicate rows count</th>
+            <th>Reconciliation needed</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -52,6 +56,10 @@ export default function BatchTable({ batches, loading }: { batches: IngestionBat
               <td>{batch.failed_rows}</td>
               <td>{batch.low_confidence_rows}</td>
               <td>{batch.llm_suggested_rows}</td>
+              <td>{batch.is_duplicate_file ? <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">DUPLICATE FILE</span> : "No"}</td>
+              <td>{batch.duplicate_of_batch ? <span className="font-mono text-xs">{shortId(batch.duplicate_of_batch)}</span> : "None"}</td>
+              <td>{batch.duplicate_rows_count}</td>
+              <td>{batch.reconciliation_needed_count ? `${batch.reconciliation_needed_count} rows` : "No"}</td>
               <td>
                 <Link to={`/ingestion/batches/${batch.id}`} className="btn py-1 text-xs">
                   View batch

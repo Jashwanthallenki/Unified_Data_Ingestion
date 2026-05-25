@@ -13,6 +13,13 @@ export interface IngestionBatch {
   original_filename: string | null;
   api_sync_range_start: string | null;
   api_sync_range_end: string | null;
+  file_hash: string | null;
+  content_hash: string | null;
+  sync_key: string | null;
+  is_duplicate_file: boolean;
+  duplicate_of_batch: string | null;
+  duplicate_rows_count: number;
+  reconciliation_needed_count: number;
   uploaded_at: string;
   status: "PROCESSING" | "COMPLETE" | "FAILED" | "PARTIAL";
   total_rows: number;
@@ -47,6 +54,10 @@ export interface RawRecord {
   source_type: string;
   row_number: number;
   raw_payload: Record<string, unknown>;
+  row_hash: string;
+  source_event_key: string | null;
+  is_duplicate_row: boolean;
+  duplicate_of_raw_record: string | null;
   parse_status: "PARSED" | "FAILED" | "EXCLUDED";
   eligibility_status: string | null;
   exclusion_reason: string | null;
@@ -116,7 +127,11 @@ export interface NormalizedActivity {
   vendor: string | null;
   cost_center: string | null;
   reference_id: string | null;
+  event_key: string | null;
+  parent_event_key: string | null;
   is_duplicate: boolean;
+  duplicate_of_activity: string | null;
+  duplicate_reason: string | null;
   is_reversal: boolean;
   is_estimate: boolean;
   requires_reconciliation: boolean;
@@ -173,6 +188,12 @@ export interface ExclusionRow {
   parse_status: string;
   eligibility_status: string | null;
   raw_payload: Record<string, unknown>;
+}
+
+export interface BatchDuplicateInfo {
+  batch: IngestionBatch;
+  duplicate_raw_rows: RawRecord[];
+  duplicate_activities: NormalizedActivity[];
 }
 
 export interface GroqSuggestResponse {

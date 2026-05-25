@@ -71,6 +71,7 @@ class ActivityDraft:
 
     # Dedup/reversal/estimate
     is_duplicate: bool = False
+    duplicate_reason: str | None = None
     is_reversal: bool = False
     reversal_of: str | None = None
     is_estimate: bool = False

@@ -26,9 +26,13 @@ One batch per upload or travel sync. The batch row stores:
 - `source_type`, `ingestion_method`, `original_filename` or `api_sync_range_start/end`, `status`.
 - Funnel counts at every pipeline stage: `total_rows`, `raw_rows_stored`, `eligible_rows`, `excluded_rows`, `not_relevant_rows`, `failed_rows`, `flagged_rows`, `suspicious_rows`, `low_confidence_rows`, `llm_suggested_rows`, `pending_rows`, `approved_rows`, `rejected_rows`, `locked_rows`.
 - **Lookup versions in effect at ingestion**: `plant_lookup_version`, `material_lookup_version`, `unit_mapping_version`, `meter_mapping_version`, `ef_version`.
+- **Duplicate file detection**: `file_hash`, `content_hash`, `sync_key`, `is_duplicate_file`, `duplicate_of_batch`.
 
 **Why the lookup-version snapshot matters:**
 If a customer adds a plant code six weeks after an ingest, or an emission factor is bumped, I still need to be able to answer "what was this batch based on?" Storing the versions at ingestion time makes that reconstructible without time-travelling the lookups.
+
+**How duplicate batches are represented:**
+For file uploads, `file_hash` stores the hash of the original uploaded bytes and `content_hash` stores a normalized row-content hash. For travel syncs, `sync_key` stores the requested date range, such as `travel:2025-02-01:2025-05-31`. If the same tenant/source appears again, the new batch is still created, but `is_duplicate_file` and `duplicate_of_batch` point analysts to the prior evidence.
 
 ---
 
@@ -40,7 +44,11 @@ class RawRecord:
     parse_status,               # PARSED | FAILED | EXCLUDED
     eligibility_status,         # set after eligibility filter
     exclusion_reason,           # structured reason; see below
-    error_message
+    error_message,
+    row_hash,
+    source_event_key,
+    is_duplicate_row,
+    duplicate_of_raw_record
 ```
 
 Every source row is stored — including the ones I deliberately skip. The exclusion_reason values are structured, not free text:
@@ -51,6 +59,9 @@ Every source row is stored — including the ones I deliberately skip. The exclu
 
 **Why I keep excluded rows:**
 If an analyst challenges a decision, I point at the raw row. If I find an adapter bug six weeks later, I reprocess from raw without re-asking the customer for the file. Discarding excluded rows would erase the system's ability to defend itself.
+
+**Why duplicate raw rows are kept:**
+`row_hash` identifies exact canonical payload repeats. `source_event_key` identifies source-specific repeats, such as a SAP document line, utility meter billing period, or travel segment. A repeated row sets `is_duplicate_row` and links to `duplicate_of_raw_record`, but it is never deleted. The duplicate row remains available as audit evidence and for analyst reconciliation.
 
 ---
 
@@ -83,9 +94,13 @@ The analyst sees *why* this row is what it is. If a flight fell through to spend
 
 Utility bills produce one `NormalizedActivity` per overlapping calendar month, each carrying `calendar_month`, `period_start`, `period_end`, `billing_days`, `usage_per_day`. `usage_per_day` makes spike detection compare like-for-like across different billing-period lengths.
 
-### Dedup and reversal flags
+### Dedup, reconciliation, and reversal flags
 
-`is_duplicate`, `is_reversal`, `reversal_of`, `is_estimate`, `estimate_reason`, `requires_reconciliation`. Rows stay in the table even when flagged — these booleans drive filtered dashboard views and prevent naive summing.
+`event_key`, `parent_event_key`, `is_duplicate`, `duplicate_of_activity`, `duplicate_reason`, `is_reversal`, `reversal_of`, `is_estimate`, `estimate_reason`, `requires_reconciliation`. Rows stay in the table even when flagged — these booleans drive filtered dashboard views and prevent naive summing.
+
+`event_key` is the normalized identity of the real-world activity. When another activity with the same event key or a strong normalized match already exists, the newer row is marked as a duplicate and routed to review. `parent_event_key` is reserved for reversals, corrections, amendments, and related activity chains.
+
+Unresolved duplicates reduce confidence and block audit lock. The analyst must decide whether the row is a duplicate, a separate activity, the source of truth, or a row to ignore for reporting.
 
 ### Quality fields
 
@@ -119,7 +134,7 @@ Filtering by flag code on the activity list is a hot path — embedding the list
 class ReviewLog: activity, action, reviewer, comment, old_value, new_value
 ```
 
-`action` covers `APPROVED`, `REJECTED`, `FLAGGED`, `MARKED_NOT_RELEVANT`, `CLARIFICATION_REQUESTED`, `LOCKED`, `UNLOCK_REQUESTED`, `LLM_SUGGESTION_ACCEPTED`, `LLM_SUGGESTION_REJECTED`, `VALUE_OVERRIDDEN`.
+`action` covers `APPROVED`, `REJECTED`, `FLAGGED`, `MARKED_NOT_RELEVANT`, `CLARIFICATION_REQUESTED`, `LOCKED`, `UNLOCK_REQUESTED`, `LLM_SUGGESTION_ACCEPTED`, `LLM_SUGGESTION_REJECTED`, `VALUE_OVERRIDDEN`, `MARKED_DUPLICATE`, `MARKED_NOT_DUPLICATE`, `USE_AS_SOURCE_OF_TRUTH`, and `IGNORED_DUPLICATE`.
 
 Every state change writes a row with before/after JSON. Combined with the locked snapshot, the record's history is reconstructible even if downstream lookups or factor versions drift later.
 
@@ -170,6 +185,8 @@ Accepting flips `LLM_SUGGESTED` → `ANALYST_OVERRIDDEN`. A locked row can never
 ## Confidence scoring
 
 `services/confidence.py` starts every row at the method's ceiling (100 for fuel_based, 60 for spend_based, etc.) and subtracts a fixed amount per flag. The score bands into HIGH (80+) / MEDIUM (50–79) / LOW (30–49, LLM-eligible) / FAILED (<30).
+
+Duplicate and reconciliation flags deliberately lower the score. Same-batch duplicate rows, cross-batch duplicates, repeated file uploads, possible amended bills, codeshare risks, double-count risks, and unresolved reconciliation all deduct confidence. If duplicate context is unresolved, confidence cannot behave like clean audit-ready data.
 
 **Why a number and bands, not just flags:**
 - The dashboard sorts by quality to focus analyst attention.

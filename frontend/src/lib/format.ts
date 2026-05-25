@@ -52,6 +52,17 @@ export function friendlyFlag(flag: string | null | undefined) {
     REVERSAL_ROW: "Reversal row",
     SCRAP_REQUIRES_REVIEW: "Scrap requires review",
     LLM_SUGGESTION_FAILED: "AI suggestion failed",
+    DUPLICATE_FILE_UPLOAD: "Duplicate file upload",
+    DUPLICATE_ROW_IN_BATCH: "Duplicate row in batch",
+    CROSS_BATCH_DUPLICATE: "Cross-batch duplicate",
+    DUPLICATE_SAP_ROW: "Duplicate SAP row",
+    DUPLICATE_BILL_ACCOUNT_PERIOD: "Duplicate utility bill period",
+    OVERLAPPING_BILLING_PERIOD: "Overlapping billing period",
+    DUPLICATE_TRAVEL_EVENT: "Duplicate travel event",
+    DUPLICATE_TRAVEL_SYNC: "Duplicate travel sync",
+    DUPLICATE_FUEL_SOURCE: "Duplicate fuel source",
+    DOUBLE_COUNT_RISK: "Double-count risk",
+    REQUIRES_RECONCILIATION: "Requires reconciliation",
   };
   return flag ? flags[flag] || humanize(flag) : "No flag";
 }

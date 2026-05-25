@@ -9,6 +9,7 @@ The app includes:
 - an ingestion console for SAP, utility, and travel inputs,
 - source-specific normalization and validation,
 - raw source record preservation,
+- duplicate detection and reconciliation controls,
 - confidence scoring and validation flags,
 - optional Groq suggestions for low-confidence rows,
 - an analyst review dashboard,
@@ -187,6 +188,16 @@ That is why the system separates:
 
 ---
 
+## Duplicate Handling
+
+Duplicates can come from repeated uploads, repeated source rows, amended utility bills, travel resyncs, or the same activity appearing across multiple systems.
+
+The system preserves all raw rows, generates file hashes, row hashes, and source-specific event keys, flags duplicate or double-count risks, reduces confidence, and routes unresolved duplicates to analyst review. This prevents double counting while keeping the original evidence available for audit.
+
+Duplicate rows are never silently deleted. They remain linked to the prior batch, raw row, or normalized activity when a match is found. Analysts can mark a record as duplicate, mark it as not duplicate, use it as the source of truth, or ignore it for reporting with a required comment.
+
+---
+
 ## How It Works
 
 ### Request Lifecycle: Ingestion
@@ -264,6 +275,46 @@ The adapter also handles:
 - suspicious high quantities,
 - spend-based fallback for weak procurement rows.
 
+### SAP Ingestion Design: File Upload Prototype
+
+SAP ingestion is modeled as a controlled file-upload flow because real SAP integrations require client-specific credentials, SAP module permissions, network access, and field mapping.
+
+The prototype accepts MB51/ME2M-style CSV exports through:
+
+```http
+POST /api/ingestion/sap/upload/
+```
+
+with multipart form data:
+
+```txt
+file=<sap export csv>
+kind=mb51 | me2m
+```
+
+The backend then:
+
+1. reads the uploaded file bytes,
+2. calculates `file_hash` and normalized `content_hash`,
+3. parses the CSV with delimiter and header detection,
+4. applies SAP-specific column aliases, including German headers,
+5. runs movement-type and procurement rules,
+6. preserves every row as `RawRecord`,
+7. creates normalized activities for ESG-relevant rows,
+8. flags exclusions, duplicates, reversals, missing lookups, and low-confidence rows.
+
+So the SAP flow is:
+
+```txt
+SAP MB51/ME2M export
+-> POST /api/ingestion/sap/upload/
+-> file hash + row hash + SAP event keys
+-> SAP adapter applies movement/procurement logic
+-> ingestion batch and review records are created
+```
+
+This mirrors the realistic first step of SAP onboarding: the customer shares an export before a live SAP connector exists. A future SAP OData/RFC connector can feed the same adapter and normalized model.
+
 ---
 
 ## Utility Handling
@@ -284,6 +335,47 @@ Main utility rules:
 - gas rows inside electricity imports are rejected with `GAS_UTILITY_DATA_DETECTED`.
 
 This avoids treating utility bills as simple finance rows and keeps the focus on actual energy consumption quality.
+
+### Utility Ingestion Design: File Upload Prototype
+
+Utility ingestion is modeled as a utility-portal CSV upload. Real utility integrations vary heavily by provider, portal, meter setup, and billing format, so the prototype focuses on the data-quality work after a structured export is available.
+
+The prototype accepts electricity CSV exports through:
+
+```http
+POST /api/ingestion/utility/upload/
+```
+
+with multipart form data:
+
+```txt
+file=<utility electricity csv>
+```
+
+The backend then:
+
+1. reads the uploaded file bytes,
+2. calculates `file_hash` and normalized `content_hash`,
+3. parses the CSV,
+4. identifies account, meter, provider, usage, amount, and billing-period fields,
+5. applies meter-to-facility lookup,
+6. excludes non-consumption rows such as tax, late fees, refunds, and gas rows,
+7. prorates billing periods across calendar months,
+8. preserves every row as `RawRecord`,
+9. creates normalized electricity activities,
+10. flags estimated readings, amount-only rows, duplicate bills, overlapping periods, and amended-bill risks.
+
+So the utility flow is:
+
+```txt
+Utility portal CSV
+-> POST /api/ingestion/utility/upload/
+-> file hash + row hash + utility event keys
+-> utility adapter applies billing-period and meter logic
+-> ingestion batch and review records are created
+```
+
+This keeps raw bill evidence intact while preventing fees, estimates, amended bills, and overlapping meter periods from becoming clean audit-ready data without review.
 
 ---
 
@@ -317,9 +409,16 @@ Main travel rules:
 
 ---
 
-## Travel Sync Design: Pull-Only Prototype
+## Travel Ingestion Design: Pull + Push Prototype
 
-The current travel ingestion flow is intentionally **pull-only**.
+The current travel flow supports both realistic integration styles:
+
+1. **Pull sync**: the analyst selects a date range and Breathe ESG pulls Concur/Navan-shaped trips from the mock provider.
+2. **Push upload**: the analyst/data-ops user uploads Concur/Navan-shaped JSON into the mock provider pool, then runs the same sync flow.
+
+This keeps the travel adapter transport-agnostic. It does not care whether records came from a bundled fixture, a mock provider API, a JSON upload, a real Concur/Navan API, or a scheduled background sync.
+
+### Pull sync
 
 From the frontend, the user triggers:
 
@@ -327,7 +426,7 @@ From the frontend, the user triggers:
 POST /api/ingestion/travel-sync/
 ```
 
-with only a date range:
+with a date range:
 
 ```json
 {
@@ -336,63 +435,62 @@ with only a date range:
 }
 ```
 
-This POST does not send travel records into the system. It acts as a trigger for the backend to pull travel data.
-
 The backend then:
 
-1. reads the bundled travel fixture from `backend/fixtures/travel/mock_response.json`,
-2. filters the records by the requested date range,
-3. runs the records through the travel adapter,
-4. creates an `IngestionBatch`,
-5. stores `RawRecord`, `NormalizedActivity`, and `ValidationIssue` rows.
+1. reads all available mock-provider trips,
+2. includes both bundled fixture trips and any trips previously uploaded through the push endpoint,
+3. filters trips by the requested date range,
+4. runs the records through the travel adapter,
+5. creates an `IngestionBatch`,
+6. stores `RawRecord`, `NormalizedActivity`, and `ValidationIssue` rows.
 
-So the flow is:
+So the pull flow is:
 
 ```txt
 Frontend date range
-→ POST /api/ingestion/travel-sync/
-→ backend pulls mock Concur/Navan-shaped data
-→ travel adapter normalizes records
-→ ingestion batch is created
+-> POST /api/ingestion/travel-sync/
+-> backend reads mock-provider travel pool
+-> travel adapter normalizes records
+-> ingestion batch is created
 ```
 
-The mock source endpoint is:
+### Push upload into the mock provider
+
+The prototype also supports uploading travel JSON:
+
+```http
+POST /api/mock-travel/upload/
+```
+
+It accepts either:
+
+- multipart upload with a `.json` file in Concur/Navan shape, or
+- JSON body shaped like `{ "trips": [...] }`.
+
+Uploaded trips are appended to the mock provider pool and become visible to the next:
 
 ```http
 GET /api/mock-travel/sync/
+POST /api/ingestion/travel-sync/
 ```
 
-This endpoint is GET-only. It simulates a Concur/Navan-like travel provider API. It does not accept posted trip data.
+The upload endpoint validates basic shape, rejects duplicate `trip_id` values already present in the bundled fixture or upload pool, and returns accepted/rejected counts.
 
-This is deliberate.
-
-The mock travel fixture is loaded from disk and cached in memory, so a POST to `/api/mock-travel/sync/` would have nowhere to persist new trip records. The endpoint exists to simulate a provider-side API that Breathe ESG pulls from, not a user-upload destination.
-
-This mirrors how real Concur/Navan-style integrations usually work. The ESG platform polls or syncs data from the provider API using a date range, rather than expecting the frontend to push trip rows manually.
-
-In this prototype:
+### Endpoint roles
 
 ```txt
-/api/ingestion/travel-sync/  → trigger ingestion
-/api/mock-travel/sync/       → simulate external provider data
+/api/mock-travel/upload/      -> push new mock travel trips into the provider pool
+/api/mock-travel/uploads/     -> inspect or clear uploaded mock trips
+/api/mock-travel/sync/        -> preview provider trips by date range
+/api/ingestion/travel-sync/   -> create an ingestion batch from provider trips
 ```
 
-A future push-based path can be added cleanly if needed:
+This mirrors two real-world onboarding modes:
 
-```http
-POST /api/ingestion/travel/upload/
-```
+- a provider-style pull integration, where Breathe ESG polls Concur/Navan by date range,
+- a file/API push workflow, where a customer or data-ops process provides travel JSON first.
 
-That endpoint could accept a Concur/Navan-shaped JSON body or uploaded JSON file, then pass the records into the existing `travel_adapter.adapt_travel()` function.
-
-The important part is that the adapter is transport-agnostic. It does not care whether travel records came from:
-
-- a mocked API pull,
-- a real Concur/Navan API pull,
-- a JSON upload,
-- or a scheduled background sync.
-
-The same normalized model and analyst review workflow would remain unchanged.
+Both paths feed the same `travel_adapter.adapt_travel()` logic, so the normalized model, duplicate handling, confidence scoring, and analyst review workflow remain unchanged.
 
 ---
 
@@ -570,6 +668,7 @@ Tenant is resolved from `DEFAULT_TENANT_SLUG` in this single-tenant prototype.
 | `GET` | `/ingestion/batches/<uuid>/` | — | batch detail |
 | `GET` | `/ingestion/batches/<uuid>/raw-records/` | — | raw rows |
 | `GET` | `/ingestion/batches/<uuid>/exclusions/` | — | exclusion reasons |
+| `GET` | `/ingestion/batches/<uuid>/duplicates/` | — | duplicate raw rows and activities |
 
 ### Review
 
@@ -587,12 +686,19 @@ Tenant is resolved from `DEFAULT_TENANT_SLUG` in this single-tenant prototype.
 | `POST` | `/review/activities/<uuid>/groq-suggest/` | optional `force` | Groq suggestion result |
 | `POST` | `/review/activities/<uuid>/accept-llm-suggestion/` | field | suggestion accepted |
 | `POST` | `/review/activities/<uuid>/reject-llm-suggestion/` | field | suggestion rejected |
+| `POST` | `/review/activities/<uuid>/mark-duplicate/` | required comment | duplicate reconciliation logged |
+| `POST` | `/review/activities/<uuid>/mark-not-duplicate/` | required comment | duplicate risk resolved |
+| `POST` | `/review/activities/<uuid>/use-as-source-of-truth/` | required comment | record selected and approved |
+| `POST` | `/review/activities/<uuid>/ignore-duplicate/` | required comment | duplicate ignored for reporting |
 
 ### Mock Travel
 
 | Method | Path | Body / Params | Response |
 |---|---|---|
 | `GET` | `/mock-travel/sync/` | query: `start_date`, `end_date` | Concur/Navan-shaped JSON |
+| `POST` | `/mock-travel/upload/` | multipart JSON file or JSON body with `trips` | accepted/rejected upload counts |
+| `GET` | `/mock-travel/uploads/` | — | uploaded mock trip pool |
+| `DELETE` | `/mock-travel/uploads/` | — | clears uploaded mock trips |
 
 ---
 
@@ -742,7 +848,7 @@ With servers running:
    - kind = `mb51`
 3. Upload utility fixture:
    - [`backend/fixtures/utility/utility_electricity_export.csv`](backend/fixtures/utility/utility_electricity_export.csv)
-4. Run travel sync:
+4. Optionally upload Concur/Navan-shaped travel JSON into `/api/mock-travel/upload/`, then run travel sync:
    - start date: `2025-02-01`
    - end date: `2025-05-31`
 5. Open `/ingestion/batches` and inspect batch counts.

@@ -24,6 +24,8 @@ const filterConfig = [
       ["SPEND_BASED_FALLBACK", "Spend-based estimate"],
       ["SUSPICIOUS_HIGH_QUANTITY", "Suspicious high quantity"],
       ["POSSIBLE_AMENDED_BILL", "Possible amended bill"],
+      ["DOUBLE_COUNT_RISK", "Double-count risk"],
+      ["CROSS_BATCH_DUPLICATE", "Cross-batch duplicate"],
       ["UNKNOWN_UNIT", "Unknown unit"],
     ],
   },
@@ -135,6 +137,31 @@ export default function ActivityList() {
               onChange={(event) => setParam("search", event.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
+          </label>
+          <label>
+            <span className="label">Duplicate view</span>
+            <select
+              value={searchParams.get("duplicate_view") || ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                const next = new URLSearchParams(searchParams);
+                next.delete("duplicate");
+                next.delete("reconciliation");
+                next.delete("double_count");
+                next.delete("duplicate_view");
+                if (value) {
+                  next.set("duplicate_view", value);
+                  next.set(value, "true");
+                }
+                setSearchParams(next);
+              }}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">All records</option>
+              <option value="reconciliation">Needs reconciliation</option>
+              <option value="duplicate">Duplicates</option>
+              <option value="double_count">Double-count risk</option>
+            </select>
           </label>
         </div>
         <p className="mt-3 text-sm text-slate-600">

@@ -36,6 +36,23 @@ def _flag_filter(code: str) -> Q:
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
+DUPLICATE_FLAGS = {
+    "DUPLICATE_FILE_UPLOAD",
+    "DUPLICATE_ROW_IN_BATCH",
+    "CROSS_BATCH_DUPLICATE",
+    "DUPLICATE_DOCUMENT",
+    "DUPLICATE_SAP_ROW",
+    "DUPLICATE_BILL_ACCOUNT_PERIOD",
+    "OVERLAPPING_BILLING_PERIOD",
+    "POSSIBLE_AMENDED_BILL",
+    "DUPLICATE_TRAVEL_EVENT",
+    "POSSIBLE_CODESHARE_DUPLICATE",
+    "DUPLICATE_FUEL_SOURCE",
+    "DOUBLE_COUNT_RISK",
+    "REQUIRES_RECONCILIATION",
+    "DUPLICATE_TRAVEL_SYNC",
+}
+
 
 def _current_user():
     """Return the seeded 'analyst' user as the implicit reviewer."""
@@ -96,6 +113,12 @@ class ActivityListView(ListAPIView):
                 _flag_filter("SUSPICIOUS_HIGH_QUANTITY")
                 | _flag_filter("USAGE_SPIKE_AFTER_DAY_NORMALIZATION")
             )
+        if (duplicate := qp.get("duplicate")) and duplicate.lower() in {"1", "true", "yes"}:
+            qs = qs.filter(Q(is_duplicate=True) | _flag_filter("DUPLICATE_FILE_UPLOAD") | _flag_filter("CROSS_BATCH_DUPLICATE"))
+        if (reconciliation := qp.get("reconciliation")) and reconciliation.lower() in {"1", "true", "yes"}:
+            qs = qs.filter(requires_reconciliation=True)
+        if (double_count := qp.get("double_count")) and double_count.lower() in {"1", "true", "yes"}:
+            qs = qs.filter(_flag_filter("DOUBLE_COUNT_RISK") | _flag_filter("DUPLICATE_FUEL_SOURCE"))
         if (locked := qp.get("locked")):
             if locked.lower() in {"1", "true"}:
                 qs = qs.exclude(locked_at__isnull=True)
@@ -135,6 +158,11 @@ class ActivityApproveView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
         comment = (request.data or {}).get("comment")
+        if _is_unresolved_duplicate(activity) and not comment:
+            return Response(
+                {"detail": "Duplicate or reconciliation-risk rows require an analyst comment before approval."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         user = _current_user()
         activity.review_status = "APPROVED"
         activity.reviewed_by = user
@@ -274,6 +302,11 @@ class ActivityLockView(APIView):
         if activity.llm_suggestions and not activity.llm_suggestion_reviewed:
             return Response({"detail": "Locked rows must have all LLM suggestions reviewed."},
                             status=status.HTTP_409_CONFLICT)
+        if _is_unresolved_duplicate(activity):
+            return Response(
+                {"detail": "Resolve duplicate/reconciliation context before locking this record."},
+                status=status.HTTP_409_CONFLICT,
+            )
         user = _current_user()
         snapshot = {
             "field_provenance": deepcopy(activity.field_provenance or {}),
@@ -429,6 +462,58 @@ class ActivityRejectLlmView(APIView):
         return Response(NormalizedActivityDetailSerializer(activity).data)
 
 
+class ActivityMarkDuplicateView(APIView):
+    def post(self, request, activity_id, *args, **kwargs):
+        return _reconcile_duplicate(
+            activity_id,
+            request.data or {},
+            action="MARKED_DUPLICATE",
+            review_status="MARKED_NOT_RELEVANT",
+            eligibility_status="NOT_RELEVANT",
+            is_duplicate=True,
+            use_record=False,
+        )
+
+
+class ActivityMarkNotDuplicateView(APIView):
+    def post(self, request, activity_id, *args, **kwargs):
+        return _reconcile_duplicate(
+            activity_id,
+            request.data or {},
+            action="MARKED_NOT_DUPLICATE",
+            review_status="PENDING",
+            eligibility_status=None,
+            is_duplicate=False,
+            use_record=False,
+        )
+
+
+class ActivityUseAsSourceOfTruthView(APIView):
+    def post(self, request, activity_id, *args, **kwargs):
+        return _reconcile_duplicate(
+            activity_id,
+            request.data or {},
+            action="USE_AS_SOURCE_OF_TRUTH",
+            review_status="APPROVED",
+            eligibility_status="ELIGIBLE",
+            is_duplicate=False,
+            use_record=True,
+        )
+
+
+class ActivityIgnoreDuplicateView(APIView):
+    def post(self, request, activity_id, *args, **kwargs):
+        return _reconcile_duplicate(
+            activity_id,
+            request.data or {},
+            action="IGNORED_DUPLICATE",
+            review_status="MARKED_NOT_RELEVANT",
+            eligibility_status="NOT_RELEVANT",
+            is_duplicate=True,
+            use_record=False,
+        )
+
+
 class ReviewSummaryView(APIView):
     def get(self, request, *args, **kwargs):
         tenant = get_tenant()
@@ -491,6 +576,64 @@ def _bump_batch_count(activity: NormalizedActivity) -> None:
     ])
 
 
+def _reconcile_duplicate(
+    activity_id,
+    data,
+    *,
+    action: str,
+    review_status: str,
+    eligibility_status: str | None,
+    is_duplicate: bool,
+    use_record: bool,
+):
+    activity = _get_activity(activity_id)
+    if activity.locked_at is not None:
+        return Response({"detail": "Locked rows cannot be modified."}, status=status.HTTP_409_CONFLICT)
+    comment = (data.get("comment") or "").strip()
+    if not comment:
+        return Response({"detail": "Duplicate reconciliation requires a comment."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = _current_user()
+    old_value = {
+        "is_duplicate": activity.is_duplicate,
+        "duplicate_of_activity": str(activity.duplicate_of_activity_id) if activity.duplicate_of_activity_id else None,
+        "requires_reconciliation": activity.requires_reconciliation,
+        "review_status": activity.review_status,
+        "eligibility_status": activity.eligibility_status,
+    }
+    activity.is_duplicate = is_duplicate
+    activity.requires_reconciliation = False
+    activity.duplicate_reason = comment
+    if not is_duplicate:
+        activity.duplicate_of_activity = None
+    if eligibility_status is not None:
+        activity.eligibility_status = eligibility_status
+    activity.review_status = review_status
+    activity.reviewed_by = user
+    activity.reviewed_at = _now()
+    activity.review_comment = comment
+    if use_record:
+        activity.source_of_truth = "analyst_selected"
+        activity.approved_by = user
+        activity.approved_at = _now()
+    _refresh_activity_quality(activity)
+    activity.save(update_fields=[
+        "is_duplicate", "duplicate_of_activity", "duplicate_reason",
+        "requires_reconciliation", "eligibility_status", "review_status",
+        "reviewed_by", "reviewed_at", "review_comment", "source_of_truth",
+        "approved_by", "approved_at", "data_quality_score", "confidence_level",
+        "updated_at",
+    ])
+    _log(activity, action, user, comment=comment, old_value=old_value, new_value={
+        "is_duplicate": activity.is_duplicate,
+        "requires_reconciliation": activity.requires_reconciliation,
+        "review_status": activity.review_status,
+        "eligibility_status": activity.eligibility_status,
+    })
+    _bump_batch_count(activity)
+    return Response(NormalizedActivityDetailSerializer(activity).data)
+
+
 def _llm_target_field(field: str) -> str:
     if field == "fuel_type":
         return "activity_subtype"
@@ -516,7 +659,19 @@ def _coerce_llm_value(field: str, value):
 
 def _refresh_quality_after_llm_review(activity: NormalizedActivity) -> None:
     """Keep AI audit flags, but do not penalize reviewed AI suggestions."""
+    _refresh_activity_quality(activity)
+
+
+def _is_unresolved_duplicate(activity: NormalizedActivity) -> bool:
+    flags = set(activity.flags or [])
+    return bool(activity.requires_reconciliation or (flags & DUPLICATE_FLAGS and activity.review_status not in {"APPROVED", "MARKED_NOT_RELEVANT", "LOCKED"}))
+
+
+def _refresh_activity_quality(activity: NormalizedActivity) -> None:
+    """Recompute quality while preserving audit flags."""
     ignored_flags = {"LLM_SUGGESTED_FIELD"} if activity.llm_suggestion_reviewed else set()
+    if not activity.requires_reconciliation:
+        ignored_flags |= DUPLICATE_FLAGS
     activity.data_quality_score, activity.confidence_level = score_from_method_and_flags(
         calculation_method=activity.calculation_method,
         emission_method=activity.emission_method,

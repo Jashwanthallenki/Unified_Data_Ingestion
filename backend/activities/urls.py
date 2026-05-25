@@ -14,5 +14,9 @@ urlpatterns = [
     path("activities/<uuid:activity_id>/groq-suggest/", views.ActivityGroqSuggestView.as_view(), name="review-groq-suggest"),
     path("activities/<uuid:activity_id>/accept-llm-suggestion/", views.ActivityAcceptLlmView.as_view(), name="review-llm-accept"),
     path("activities/<uuid:activity_id>/reject-llm-suggestion/", views.ActivityRejectLlmView.as_view(), name="review-llm-reject"),
+    path("activities/<uuid:activity_id>/mark-duplicate/", views.ActivityMarkDuplicateView.as_view(), name="review-mark-duplicate"),
+    path("activities/<uuid:activity_id>/mark-not-duplicate/", views.ActivityMarkNotDuplicateView.as_view(), name="review-mark-not-duplicate"),
+    path("activities/<uuid:activity_id>/use-as-source-of-truth/", views.ActivityUseAsSourceOfTruthView.as_view(), name="review-use-source-of-truth"),
+    path("activities/<uuid:activity_id>/ignore-duplicate/", views.ActivityIgnoreDuplicateView.as_view(), name="review-ignore-duplicate"),
     path("summary/", views.ReviewSummaryView.as_view(), name="review-summary"),
 ]

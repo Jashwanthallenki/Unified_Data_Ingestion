@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getBatch, listActivities, listBatchExclusions, listBatchRaw } from "../../api/client";
-import type { ExclusionRow, IngestionBatch, NormalizedActivity, RawRecord } from "../../api/types";
+import { getBatch, getBatchDuplicates, listActivities, listBatchExclusions, listBatchRaw } from "../../api/client";
+import type { BatchDuplicateInfo, ExclusionRow, IngestionBatch, NormalizedActivity, RawRecord } from "../../api/types";
 import ActivityTable from "../../components/ActivityTable";
 import { SourceBadge, StatusBadge } from "../../components/Badges";
 import PageHeader from "../../components/PageHeader";
@@ -15,7 +15,7 @@ import {
   shortId,
 } from "../../lib/format";
 
-const tabs = ["Summary", "Normalized Rows", "Excluded Rows", "Failed Rows", "Validation Issues"] as const;
+const tabs = ["Summary", "Normalized Rows", "Excluded Rows", "Failed Rows", "Validation Issues", "Duplicates"] as const;
 type Tab = (typeof tabs)[number];
 
 export default function BatchDetail() {
@@ -24,6 +24,7 @@ export default function BatchDetail() {
   const [activities, setActivities] = useState<NormalizedActivity[]>([]);
   const [rawRows, setRawRows] = useState<RawRecord[]>([]);
   const [exclusions, setExclusions] = useState<ExclusionRow[]>([]);
+  const [duplicates, setDuplicates] = useState<BatchDuplicateInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("Summary");
@@ -37,12 +38,14 @@ export default function BatchDetail() {
       listActivities({ batch: id }),
       listBatchRaw(id),
       listBatchExclusions(id),
+      getBatchDuplicates(id),
     ])
-      .then(([batchResult, activityResult, rawResult, exclusionResult]) => {
+      .then(([batchResult, activityResult, rawResult, exclusionResult, duplicateResult]) => {
         setBatch(batchResult);
         setActivities(activityResult.results);
         setRawRows(rawResult.results);
         setExclusions(exclusionResult.results);
+        setDuplicates(duplicateResult);
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
@@ -121,6 +124,7 @@ export default function BatchDetail() {
       {activeTab === "Excluded Rows" ? <ExcludedTab exclusions={exclusions} /> : null}
       {activeTab === "Failed Rows" ? <FailedTab rows={failedRows} /> : null}
       {activeTab === "Validation Issues" ? <ValidationTab activities={issueRows} /> : null}
+      {activeTab === "Duplicates" ? <DuplicatesTab duplicates={duplicates} /> : null}
     </div>
   );
 }
@@ -269,6 +273,60 @@ function ValidationTab({ activities }: { activities: NormalizedActivity[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function DuplicatesTab({ duplicates }: { duplicates: BatchDuplicateInfo | null }) {
+  const rawRows = duplicates?.duplicate_raw_rows || [];
+  const activities = duplicates?.duplicate_activities || [];
+  if (!rawRows.length && !activities.length) {
+    return (
+      <EmptyState
+        title="No duplicates detected in this batch."
+        message="If this batch duplicates another upload or sync, duplicate raw rows and activities will appear here."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        Duplicate rows are preserved for audit. They are flagged so an analyst can prevent double counting before lock.
+      </div>
+      {rawRows.length ? (
+        <section className="card overflow-x-auto">
+          <div className="border-b border-slate-200 p-4">
+            <h2 className="text-base font-semibold text-slate-950">Duplicate raw rows</h2>
+          </div>
+          <table className="table-default min-w-full">
+            <thead>
+              <tr>
+                <th>Row</th>
+                <th>Source event key</th>
+                <th>Duplicate of raw row</th>
+                <th>Raw excerpt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rawRows.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.row_number}</td>
+                  <td className="max-w-md truncate font-mono text-xs">{row.source_event_key || row.row_hash}</td>
+                  <td className="font-mono text-xs">{row.duplicate_of_raw_record ? shortId(row.duplicate_of_raw_record) : "In batch"}</td>
+                  <td className="max-w-xl truncate text-xs text-slate-500">{JSON.stringify(row.raw_payload)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+      {activities.length ? (
+        <section>
+          <h2 className="mb-2 text-base font-semibold text-slate-950">Duplicate activities</h2>
+          <ActivityTable activities={activities} loading={false} emptyMessage="No duplicate activities." />
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -10,4 +10,5 @@ urlpatterns = [
     path("batches/<uuid:batch_id>/", views.BatchDetailView.as_view(), name="ingestion-batch-detail"),
     path("batches/<uuid:batch_id>/raw-records/", views.BatchRawRecordsView.as_view(), name="ingestion-batch-raw"),
     path("batches/<uuid:batch_id>/exclusions/", views.BatchExclusionsView.as_view(), name="ingestion-batch-exclusions"),
+    path("batches/<uuid:batch_id>/duplicates/", views.BatchDuplicatesView.as_view(), name="ingestion-batch-duplicates"),
 ]

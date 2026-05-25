@@ -236,3 +236,13 @@ In production, file ingestion should move to background workers with queue-based
 I chose synchronous processing because the prototype’s goal is to demonstrate ingestion logic, not infrastructure scale.
 
 ---
+
+### Tradeoff 16 — Duplicate detection vs automatic deletion
+
+I chose not to automatically delete duplicates.
+
+In ESG workflows, duplicates can be true errors, amended bills, reversals, corrections, resync artifacts, or legitimate repeated activity. Deleting them would remove evidence and make later audit questions harder to answer.
+
+The safer prototype behavior is to preserve the row, flag the duplicate or double-count risk, reduce confidence, and route unresolved cases to analyst review. This adds review work, but it prevents quiet over-counting and keeps the source evidence intact.
+
+---

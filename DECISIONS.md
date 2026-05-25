@@ -198,6 +198,16 @@ Authentication is real work but it doesn't prove the data-trust judgment this pr
 
 ---
 
+## 15. Duplicate source data is preserved, not silently deleted
+
+**Decision:**
+Duplicates may originate from the client source system, repeated uploads, amended utility bills, travel resyncs, reversals, corrections, or overlapping source systems. I preserve the raw evidence but prevent duplicate rows from becoming audit-ready without analyst review.
+
+**Why I chose this:**
+In ESG workflows, automatic deletion is dangerous. A repeated row may be a true duplicate, but it may also be an amended bill, a reversal, a legitimate repeat activity, or a better source replacing a weaker one. The safer behavior is to keep the evidence, generate deterministic file/row/activity keys, flag the double-count risk, reduce confidence, and force a documented analyst decision before lock.
+
+---
+
 ## What I would ask the PM if I could
 
 These are the ambiguities I resolved by judgment call. In a real engagement I'd lock each with the PM before shipping:

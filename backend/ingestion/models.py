@@ -29,6 +29,17 @@ class IngestionBatch(models.Model):
     original_filename = models.CharField(max_length=255, null=True, blank=True)
     api_sync_range_start = models.DateField(null=True, blank=True)
     api_sync_range_end = models.DateField(null=True, blank=True)
+    file_hash = models.CharField(max_length=128, null=True, blank=True, db_index=True)
+    content_hash = models.CharField(max_length=128, null=True, blank=True, db_index=True)
+    sync_key = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    is_duplicate_file = models.BooleanField(default=False)
+    duplicate_of_batch = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="duplicate_batches",
+    )
     uploaded_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="PROCESSING")
 
@@ -88,6 +99,16 @@ class RawRecord(models.Model):
     source_type = models.CharField(max_length=32)
     row_number = models.IntegerField()
     raw_payload = models.JSONField()
+    row_hash = models.CharField(max_length=128, default="", blank=True, db_index=True)
+    source_event_key = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    is_duplicate_row = models.BooleanField(default=False)
+    duplicate_of_raw_record = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="duplicate_raw_rows",
+    )
     parse_status = models.CharField(max_length=16, choices=PARSE_STATUS_CHOICES, default="PARSED")
     eligibility_status = models.CharField(max_length=32, null=True, blank=True)
     exclusion_reason = models.CharField(max_length=128, null=True, blank=True)

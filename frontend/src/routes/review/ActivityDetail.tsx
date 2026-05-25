@@ -5,11 +5,15 @@ import {
   approveActivity,
   getActivity,
   groqSuggest,
+  ignoreDuplicate,
   lockActivity,
+  markDuplicate,
+  markNotDuplicate,
   overrideActivity,
   rejectActivity,
   rejectLlm,
   requestClarification,
+  useAsSourceOfTruth,
 } from "../../api/client";
 import type { GroqSuggestResponse, NormalizedActivityDetail } from "../../api/types";
 import ActionBar from "../../components/ActionBar";
@@ -21,7 +25,6 @@ import RawVsNormalizedView from "../../components/RawVsNormalizedView";
 import ReviewTimeline from "../../components/ReviewTimeline";
 import { ErrorState, LoadingState } from "../../components/States";
 import ValidationIssueList from "../../components/ValidationIssueList";
-import { formatActivityLocation, shortId } from "../../lib/format";
 
 export default function ActivityDetail() {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +33,7 @@ export default function ActivityDetail() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [groqResult, setGroqResult] = useState<GroqSuggestResponse | null>(null);
+  const [duplicateComment, setDuplicateComment] = useState("");
 
   useEffect(() => {
     refresh();
@@ -92,8 +96,8 @@ export default function ActivityDetail() {
   return (
     <div className="pb-40">
       <PageHeader
-        title="Can I trust this record, and what action should I take?"
-        description={`${activity.activity_type} at ${formatActivityLocation(activity)}. Record ${shortId(activity.id)} is connected back to its original source row, validation issues, provenance, and review history.`}
+        title="Activity record"
+        description="Review the source row, normalized values, validation issues, provenance, and available actions."
         actions={
           <>
             <Link to="/review/activities" className="btn">Back to queue</Link>
@@ -106,6 +110,41 @@ export default function ActivityDetail() {
 
       <div className="space-y-6">
         <ActivityDetailPanel activity={activity} />
+
+        {(activity.is_duplicate || activity.requires_reconciliation || activity.duplicate_of_activity || activity.flags.some((flag) => flag.includes("DUPLICATE") || flag === "DOUBLE_COUNT_RISK")) ? (
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-amber-950">Duplicate / Reconciliation Context</h2>
+            <p className="mt-2 text-sm leading-6 text-amber-900">
+              This record may duplicate another source row. It was preserved for audit, but it should not be counted twice unless an analyst confirms it represents a separate activity.
+            </p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <Info label="Current event key" value={activity.event_key || "Not available"} />
+              <Info label="Duplicate of activity" value={activity.duplicate_of_activity || "Not linked"} />
+              <Info label="Duplicate reason" value={activity.duplicate_reason || "Detected by source hash or event key"} />
+              <Info label="Source hierarchy recommendation" value={activity.source_hierarchy_rank ? `Rank ${activity.source_hierarchy_rank}: ${activity.source_of_truth || "source"}` : "Needs analyst judgment"} />
+            </div>
+            {!locked ? (
+              <div className="mt-4">
+                <label>
+                  <span className="label">Reconciliation comment</span>
+                  <textarea
+                    rows={2}
+                    value={duplicateComment}
+                    onChange={(event) => setDuplicateComment(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm"
+                    placeholder="Required for duplicate reconciliation actions."
+                  />
+                </label>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button className="btn" disabled={busy || !duplicateComment.trim()} onClick={() => runAction(() => markDuplicate(activity.id, duplicateComment.trim()))}>Mark as duplicate</button>
+                  <button className="btn" disabled={busy || !duplicateComment.trim()} onClick={() => runAction(() => markNotDuplicate(activity.id, duplicateComment.trim()))}>Mark as not duplicate</button>
+                  <button className="btn-primary" disabled={busy || !duplicateComment.trim()} onClick={() => runAction(() => useAsSourceOfTruth(activity.id, duplicateComment.trim()))}>Use this record</button>
+                  <button className="btn" disabled={busy || !duplicateComment.trim()} onClick={() => runAction(() => ignoreDuplicate(activity.id, duplicateComment.trim()))}>Ignore this duplicate</button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         <RawVsNormalizedView activity={activity} />
 
@@ -167,6 +206,15 @@ export default function ActivityDetail() {
         onOverride={(field, value, comment) => runAction(() => overrideActivity(activity.id, field, value, comment))}
         onLock={() => runAction(() => lockActivity(activity.id))}
       />
+    </div>
+  );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-amber-200 bg-white/70 p-3">
+      <div className="text-xs font-semibold uppercase text-amber-700">{label}</div>
+      <div className="mt-1 break-all text-sm font-medium text-slate-900">{value}</div>
     </div>
   );
 }
