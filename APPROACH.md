@@ -355,6 +355,7 @@ Direct mapping
 ```
 The goal is not to fully automate ESG reporting. The goal is to make analysts faster while keeping the system explainable, auditable, and safe.
 
+---
 
 ## 12. Groq LLM integration
 
