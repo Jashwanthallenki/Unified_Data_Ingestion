@@ -1,6 +1,4 @@
 # Breathe ESG — Real-World Data Traps and Loopholes
-## Research Document v2
-
 ---
 
 ## The Core Insight
