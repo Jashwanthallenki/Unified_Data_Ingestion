@@ -1,160 +1,238 @@
 # Breathe ESG — Tradeoffs
-
-What I deliberately did not build, and why those choices made sense for a 4-day prototype that needs to demonstrate ingestion judgment, not feature coverage.
-
----
-
-## 1. Real integrations vs realistic mock inputs
-
-**What I did not build:**
-Live SAP OData / BAPI / IDoc connections. Live utility-portal APIs. Utility PDF bill OCR. Real Concur / Navan OAuth integration.
-
-**What I built instead:**
-CSV upload for SAP and utility (that's how real onboarding handoffs arrive). A Django-hosted mock endpoint at `/api/mock-travel/sync/` returning Concur/Navan-shaped JSON, including cancelled / refunded / voided / codeshare / missing-distance / bundled-package edge cases.
-
-**Why:**
-Real integrations need credentials, sandboxes, security review, and tenant-specific configuration. That work is real but it does not exercise the data-trust judgment that's actually being graded. I'd rather demonstrate that the pipeline handles messy data correctly than that I can wire up OAuth.
-
-**What this still proves:**
-Movement-type filtering, German/English header detection, billing-period pro-rata, estimated-reading handling, cancellation filtering, hotel room-night math, leg grouping, source-hierarchy selection, deduplication, validation, confidence scoring, field provenance, analyst review, audit lock. The transport layer is the only piece that's mocked.
-
-**What changes in production:**
-The file uploader (or mock travel endpoint) is replaced by a real connector with auth, pagination, retries, and schema-drift handling. `NormalizedActivity` and the analyst workflow do not change.
+The main tradeoffs I made were not only technical shortcuts. Most of them were data-trust decisions: when to trust a source row, when to exclude it, when to estimate, and when to force analyst review. Full reasoning is documented in [TRADEOFFS.md](TRADEOFFS.md).
 
 ---
 
-## 2. Advanced emission factor engine vs ingestion correctness
+### Tradeoff 1 — Source availability vs data quality
 
-**What I did not build:**
-Full DEFRA / EPA / IEA factor sets. Versioned country/grid-specific electricity factors. Market-based Scope 2 from REC certificates. Currency-specific spend factors. Supplier-specific Scope 3. Factor uncertainty intervals.
+Client data may arrive in different levels of completeness. Some clients may provide rich activity data such as fuel quantity, unit, plant, movement type, meter number, or travel segment. Others may provide weak invoice-level or amount-only records.
 
-**What I built instead:**
-A small `EmissionFactorMapping` table with illustrative DEFRA-2024-style factors for diesel, petrol, natural gas, electricity (location-based grid average + a few country variants), flights by cabin × haul, hotel nights, car, rail, and spend-based fallback. Each factor row carries `source` + `version`. The active version is snapshotted onto the `IngestionBatch` at ingestion time.
+I chose to support both, but not treat them equally.
 
-**Why:**
-The build prompt's own framing is that the hard part is messy data, not carbon math. A production factor engine is a multi-month workstream — curation, vintage management, jurisdiction matrix, supplier-specific factors, audit trails. Spending the prototype budget on that means cutting ingestion logic, which is exactly the wrong trade.
+High-quality physical activity data becomes the preferred source. Weak spend-only or invoice-only data is preserved, normalized where possible, but marked lower confidence.
 
-**What this means for `co2e_kg`:**
-Values are computed and stored with `emission_factor_source` populated, but the magnitudes are illustrative. They show the pipeline working end-to-end; they aren't audit-grade footprint numbers and I don't want to pretend they are.
+Examples:
 
-**What changes in production:**
-`services/normalization.py` keeps selecting method and unit. The factor lookup gains jurisdiction + supplier + vintage dimensions, probably backed by an external factor service.
+- SAP goods issue with fuel quantity and unit → stronger evidence.
+- SAP purchase invoice only → weaker evidence.
+- Utility kWh with meter and billing period → stronger evidence.
+- Utility total amount only → weaker evidence.
+- Travel segment with route/distance/nights → stronger evidence.
+- Travel expense amount only → weaker evidence.
 
----
-
-## 3. Authentication and RBAC
-
-**What I did not build:**
-Login, password reset, SSO, user invitations, role assignment, per-tenant user pools, access audit logs.
-
-**What I built instead:**
-One seeded tenant ("Demo Enterprise Client") and one implicit analyst user used as the reviewer on every `ReviewLog`. The `Tenant` foreign key is on every domain row, so multi-tenant scoping is a deploy concern, not a schema refactor.
-
-**Why:**
-Auth and RBAC are real production work. They do not exercise the ingestion / provenance / review judgment this prototype is meant to demonstrate. I'd rather ship a system that handles messy SAP data correctly than a system that logs me in correctly.
-
-**What changes in production:**
-SSO + RBAC layered on the existing tenant model. Locked-row unlock gated on admin role.
+This keeps the system useful even when client data is incomplete, but prevents weak data from looking audit-ready.
 
 ---
 
-## 4. Utility PDF bill OCR
+### Tradeoff 2 — Purchase data vs actual consumption
 
-**What I did not build:**
-OCR or layout extraction for scanned utility bill PDFs.
+A purchase is not always an emission event.
 
-**What I built instead:**
-CSV ingestion for utility-portal exports (account, meter, billing period, usage_kwh, demand, charges, reading type).
+For fuel, SAP may show that diesel was purchased or received into inventory, but that does not mean it was burned in the same reporting period. Counting purchase rows as Scope 1 emissions can overstate emissions or double-count when actual consumption data also exists.
 
-**Why:**
-PDF utility bill extraction is its own domain — OCR engines, per-utility templates, layout parsers, LLM-assisted extraction with verification. Half-built OCR is worse than no OCR: it produces wrong-looking values that look right. The ESG question is what to do with the structured data, which is what I focused on.
+I used a source hierarchy:
 
-**What changes in production:**
-A document-processing pipeline upstream of the existing utility adapter. Same `NormalizedActivity` model after.
+1. actual consumption / meter / fuel log,
+2. goods issue / tank issue,
+3. purchase invoice as fallback.
 
----
+This means goods receipt and invoice records are useful for reconciliation, but actual consumption-like records are preferred for emissions.
 
-## 5. Real Concur / Navan OAuth
-
-**What I did not build:**
-OAuth 2.0 handshake, refresh-token rotation, scope management, per-tenant credential storage, real provider rate-limit handling.
-
-**What I built instead:**
-A mock endpoint `/api/mock-travel/sync/` returning Concur/Navan-shaped JSON. The travel ingestion flow calls it the same way it would call a real provider.
-
-**Why:**
-The judgment under test is whether the adapter handles cancellations, leg grouping, cabin classes, codeshare duplicates, distance fallbacks, hotel room-night math, and bundled packages — not whether I can complete an OAuth dance.
-
-**What changes in production:**
-`/api/mock-travel/` is deleted. The travel adapter's HTTP client points at the real provider with auth + pagination. Downstream logic stays put.
+The tradeoff is that I may delay or downgrade some purchase records instead of immediately converting them into emissions. That is intentional because accuracy and auditability matter more than maximizing row count.
 
 ---
 
-## 6. Full SAP procurement universe
+### Tradeoff 3 — Ingest every row vs filter ESG-relevant rows
 
-**What I did not build:**
-SAP FI, CO, MIRO documents. Custom Z-fields. S/4 HANA-renamed field variants. Production confirmation chains. SAP fleet-management modules.
+I decided not to blindly convert every incoming SAP, utility, or travel row into a `NormalizedActivity`.
 
-**What I built instead:**
-MB51 (goods movements — primary fuel source) and ME2M (procurement — spend-based fallback). The adapter is column-mapping driven, so new SAP shapes become new mappings, not new models.
+Every raw row is preserved, but only ESG-relevant rows become reviewable activity records.
 
-**Why:**
-MB51 and ME2M cover the bulk of what an onboarding sustainability team has access to. The long tail of SAP modules adds breadth, not depth.
+Examples:
 
----
+- SAP `101` goods receipt is stored but not counted as fuel consumption.
+- SAP `311` stock transfer is stored but excluded from emissions.
+- Utility tax-only or late-fee-only rows are stored but marked not relevant.
+- Cancelled or refunded travel bookings are stored but excluded.
+- Expense-only travel rows without a travel segment are stored but not treated as travel activity.
 
-## 7. Market-based Scope 2 evidence validation
-
-**What I did not build:**
-REC / GO / I-REC certificate validation, renewable contract parsing, certificate retirement tracking, market-based factor application from verified evidence.
-
-**What I built instead:**
-Location-based Scope 2 by default. If a row claims market-based but evidence is absent, I flag `MARKET_BASED_SCOPE2_EVIDENCE_MISSING` and route to analyst review.
-
-**Why:**
-Market-based Scope 2 is evidence-heavy and regulated. Half-implemented certificate validation creates false confidence around renewable claims, which is worse than not implementing it. Flagging it explicitly is honest.
-
-**What changes in production:**
-A certificate-management subsystem for REC tracking + retirement + period matching.
+This tradeoff reduces false positives and double counting. The cost is that the ingestion pipeline needs stronger eligibility rules and exclusion logs.
 
 ---
 
-## 8. Groq is not allowed to generate numerics — permanent, not provisional
+### Tradeoff 4 — Rule-based logic vs LLM-assisted reasoning
 
-**What I deliberately restricted:**
-Groq cannot suggest values for quantity, distance, usage_kwh, room_nights, dates, document numbers, ticket numbers, invoice numbers, bill numbers, or amounts. The response parser drops any suggestion for a forbidden field and records a note.
+I used deterministic rules first and Groq only as a controlled fallback.
 
-**What Groq can do:**
-Classify ambiguous material descriptions, suggest spend categories, judge ESG relevance, explain low confidence, suggest analyst follow-up questions. All output lands in `field_provenance` as `LLM_SUGGESTED` and must be explicitly accepted by an analyst before the row can be locked.
+Direct source mapping and lookup tables are more auditable than LLM output. Groq is used only when the row is low-confidence, rule-based mapping failed, and the raw data still contains useful text context.
 
-**Why:**
-Numeric hallucination is the highest-impact failure mode in an ESG system. A hallucinated kWh is indistinguishable from a real one in downstream reports. The dividing line between "assist" and "fabricate" is exactly the line between text classification and numeric generation. This is not a prototype limitation — it's a permanent design constraint.
+Groq can suggest classifications such as material category or spend category, but it cannot generate quantities, dates, document numbers, kWh, distances, or audit references.
 
----
+This tradeoff keeps the benefits of AI without allowing AI to become the source of truth.
 
-## 9. UI polish, animations, design system
+The boundary is:
 
-**What I did not build:**
-Custom design system, animations, dark mode, deep accessibility audit, mobile-responsive beyond what Tailwind gives for free.
-
-**What I built instead:**
-Plain functional UI with Tailwind. Color-coded badges for the high-signal states the analyst needs to spot at a glance: `SPEND_BASED` (amber), `ESTIMATED_READING` (blue), `LLM_SUGGESTED` (purple), `LOCKED` (indigo), `SUSPICIOUS_*` (rose). Summary cards link directly to filtered table views.
-
-**Why:**
-The prototype demonstrates ingestion + review logic. Visual polish does not move that needle.
+- rules handle numeric and auditable transformations,
+- Groq helps with ambiguous text interpretation,
+- analysts approve or reject every suggestion.
 
 ---
 
-## 10. Background job processing
+### Tradeoff 5 — Confidence threshold vs API cost
 
-**What I did not build:**
-Celery / RQ / Django-Q queue for async file processing.
+Using Groq for every row would be expensive and unnecessary. Most rows can be handled through direct mapping or deterministic rules.
 
-**What I built instead:**
-Synchronous processing inside the upload endpoint. The batch summary is the response.
+I introduced confidence thresholds:
 
-**Why:**
-For the prototype's row counts (tens to low thousands), synchronous works. Adding workers, queues, and Redis adds deployment complexity without exercising any new judgment.
+- high confidence rows go directly to analyst approval,
+- medium confidence rows need review,
+- low confidence rows may trigger Groq,
+- failed rows stay manual.
 
-**What changes in production:**
-Queue-based ingestion. Upload endpoint creates an `IngestionBatch` in `PROCESSING` status and returns immediately; a worker drains the queue and updates progress.
+This saves API cost and keeps AI usage explainable. The tradeoff is that some rows that might benefit from AI will still be handled manually if they do not meet the threshold.
+
+I chose this because the system should use LLMs selectively, not as a default parser.
+
+---
+
+### Tradeoff 6 — Normalize into one model vs preserve source-specific context
+
+The system needs one unified `NormalizedActivity` model so analysts can review SAP, utility, and travel records in one dashboard.
+
+But each source has unique context:
+
+- SAP has movement types, material codes, plant codes, reversals.
+- Utility has meters, billing periods, estimated readings, usage per day.
+- Travel has segments, booking status, cabin class, room nights, leg grouping.
+
+I chose a common normalized model plus source-specific fields, flags, provenance, and raw payload preservation.
+
+This gives the analyst one review experience without losing source-specific meaning.
+
+---
+
+### Tradeoff 7 — Utility bill amount vs actual energy usage
+
+A utility bill total is useful for accounting, but it is not enough for ESG.
+
+I chose `usage_kwh`, billing period, meter number, and reading type as the main utility fields. Amount-only rows are preserved but marked low confidence.
+
+This prevents the system from treating financial charges, taxes, deposits, late fees, or previous balances as energy consumption.
+
+The tradeoff is that some utility records cannot become high-confidence ESG activity unless the client provides actual usage data.
+
+---
+
+### Tradeoff 8 — Billing-period accuracy vs implementation complexity
+
+Utility bills do not align cleanly with calendar months. I chose to prorate usage across calendar months based on billing days.
+
+This is not perfect because real usage may vary by weather, weekday/weekend patterns, occupancy, or production cycles. But without interval data, day-based prorating is more accurate than assigning the full bill to a single month.
+
+I also calculate `usage_per_day` so a 35-day bill is not unfairly compared with a 28-day bill.
+
+This is a practical tradeoff between correctness and available data.
+
+---
+
+### Tradeoff 9 — Travel booking data vs completed travel evidence
+
+A travel booking is not always actual travel.
+
+Flights can be cancelled, hotels can be refunded, and bookings can be voided. I chose to preserve these records as raw evidence but exclude them from normalized emissions activity.
+
+This avoids overstating Scope 3 business travel emissions.
+
+The tradeoff is that the adapter must track booking status and exclusion reasons rather than simply counting every travel record returned by the API.
+
+---
+
+### Tradeoff 10 — Simple approval vs audit lock
+
+Approval and audit lock are separate.
+
+Approval means an analyst accepts the row. Audit lock means the row becomes frozen evidence for reporting or audit.
+
+I chose to separate them because approved ESG data may later be used in reports, auditor review, investor disclosures, or compliance workflows. Once locked, the record should not be silently changed.
+
+The tradeoff is extra workflow complexity, but it gives a stronger audit trail.
+
+---
+
+### Tradeoff 11 — Mock integrations vs real integration setup
+
+I did not build live SAP, utility, or travel integrations.
+
+Instead:
+
+- SAP uses realistic MB51/ME2M-style CSV uploads.
+- Utility uses realistic portal/Green Button-like CSV uploads.
+- Travel uses a mocked Concur/Navan-like API endpoint.
+
+Real integrations require credentials, security review, OAuth, sandbox access, and tenant-specific setup. For this prototype, I chose to prove the ingestion-control logic using realistic data shapes.
+
+The adapter design keeps the transport layer replaceable later. A real SAP OData client or Concur OAuth client can replace the mock/file input without changing the normalized model or analyst workflow.
+
+---
+
+### Tradeoff 12 — Emission calculation depth vs ingestion trust
+
+I kept emission calculations intentionally minimal.
+
+The assignment’s core problem is messy source data, not building a full carbon factor engine. I use a small `EmissionFactorMapping` table with illustrative factors so the flow from activity to `co2e_kg` is visible, but the main effort is on:
+
+- raw record preservation,
+- eligibility filtering,
+- unit normalization,
+- confidence scoring,
+- field provenance,
+- analyst review,
+- audit lock.
+
+A production emission factor engine would need factor versioning, country/grid-specific factors, market-based Scope 2 evidence, supplier-specific factors, and uncertainty handling. That is a separate workstream.
+
+---
+
+### Tradeoff 13 — Multi-tenancy schema vs full tenant management UI
+
+I added a `Tenant` model because each client company has its own data, mappings, uploads, and review history.
+
+For the prototype, I seed one tenant: `Demo Enterprise Client`.
+
+I did not build tenant switching, invitations, user pools, or full RBAC. But every major domain model is tenant-scoped, so multi-tenancy is supported in the schema.
+
+This proves the data model is ready for multiple client companies without spending the prototype budget on account-management UI.
+
+---
+
+### Tradeoff 14 — Functional analyst UX vs visual polish
+
+I prioritized analyst clarity over visual polish.
+
+The UI focuses on:
+
+- what came in,
+- what failed,
+- what was excluded,
+- what needs review,
+- why a row is suspicious,
+- where each value came from,
+- what action the analyst should take.
+
+I used clear cards, filters, badges, raw-vs-normalized comparison, validation messages, provenance tables, and review actions.
+
+I did not prioritize animations, a custom design system, or decorative UI because those do not improve data trust.
+
+---
+
+### Tradeoff 15 — Synchronous ingestion vs production-grade background jobs
+
+The prototype processes uploads synchronously.
+
+For the sample file sizes, this is acceptable and keeps deployment simple on Render.
+
+In production, file ingestion should move to background workers with queue-based processing, progress tracking, retries, and partial failure recovery.
+
+I chose synchronous processing because the prototype’s goal is to demonstrate ingestion logic, not infrastructure scale.
+
+---
